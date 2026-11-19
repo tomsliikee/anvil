@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/My Lib/">
+    <Project Path="My Lib/Lib.csproj" />
+  </Folder>
+  <Project Path="App/App.csproj" />
+</Solution>

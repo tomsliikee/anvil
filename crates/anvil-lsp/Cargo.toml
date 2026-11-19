@@ -1,0 +1,12 @@
+[package]
+name = "anvil-lsp"
+description = "Language server client for Roslyn's C# server, over stdio."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+lsp-types = "0.97"

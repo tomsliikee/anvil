@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <enum id="io.github.tomsliikee.Anvil.ColorScheme">
+    <value nick="system" value="0"/>
+    <value nick="light" value="1"/>
+    <value nick="dark" value="2"/>
+  </enum>
+  <enum id="io.github.tomsliikee.Anvil.Language">
+    <value nick="system" value="0"/>
+    <value nick="en" value="1"/>
+    <value nick="de" value="2"/>
+  </enum>
+  <enum id="io.github.tomsliikee.Anvil.SolutionFormat">
+    <value nick="slnx" value="0"/>
+    <value nick="sln" value="1"/>
+  </enum>
+  <schema id="io.github.tomsliikee.Anvil" path="/io/github/tomsliikee/Anvil/">
+    <key name="color-scheme" enum="io.github.tomsliikee.Anvil.ColorScheme"><default>"system"</default><summary>Light, dark, or follow the system</summary></key>
+    <key name="language" enum="io.github.tomsliikee.Anvil.Language"><default>"system"</default><summary>Interface language</summary></key>
+    <key name="window-width" type="i"><default>1440</default><summary>Window width</summary></key>
+    <key name="window-height" type="i"><default>900</default><summary>Window height</summary></key>
+    <key name="window-maximized" type="b"><default>false</default><summary>Window maximised</summary></key>
+    <key name="side-width" type="i"><default>320</default><summary>Width of the Solution Explorer column</summary></key>
+    <key name="bottom-height" type="i"><default>240</default><summary>Height of the bottom panel</summary></key>
+    <key name="recent-solutions" type="as"><default>[]</default><summary>Recently opened solutions, newest first</summary></key>
+    <key name="new-solution-format" enum="io.github.tomsliikee.Anvil.SolutionFormat"><default>"slnx"</default><summary>Format of new solutions</summary></key>
+    <key name="word-wrap" type="b"><default>false</default><summary>Wrap long lines</summary></key>
+    <key name="show-whitespace" type="b"><default>false</default><summary>Show spaces and tabs</summary></key>
+    <key name="codelens" type="b"><default>false</default><summary>Show reference counts above members</summary></key>
+    <key name="blame" type="b"><default>false</default><summary>Show git blame in the gutter</summary></key>
+    <key name="show-stylecop" type="b"><default>true</default><summary>Show StyleCop (SA) rules in the Error List</summary></key>
+    <key name="roslyn-consent" type="b"><default>false</default><summary>The user agreed to download the Roslyn language server</summary></key>
+    <key name="netcoredbg-consent" type="b"><default>false</default><summary>The user agreed to download netcoredbg</summary></key>
+    <key name="ai-enabled" type="b"><default>false</default><summary>Master switch for all AI features</summary></key>
+    <key name="ai-inline" type="b"><default>false</default><summary>Inline completion (ghost text)</summary></key>
+    <key name="ai-chat" type="b"><default>false</default><summary>AI chat panel</summary></key>
+    <key name="ai-inline-model" type="s"><default>""</default><summary>Ollama model for inline completion</summary></key>
+    <key name="ai-chat-model" type="s"><default>""</default><summary>Ollama model for the chat</summary></key>
+    <key name="ollama-url" type="s"><default>"http://localhost:11434"</default><summary>Address of the local Ollama</summary></key>
+  </schema>
+</schemalist>

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Anvil
+Comment=Write, build, debug and diagram C# solutions that open unchanged in Visual Studio
+Exec=anvil %F
+Icon=io.github.tomsliikee.Anvil
+Terminal=false
+Type=Application
+Categories=Development;IDE;GTK;
+Keywords=csharp;dotnet;visual studio;ide;class diagram;stylecop;
+MimeType=text/x-csharp;application/x-sln;
+StartupNotify=true

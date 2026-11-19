@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- XML for project files, solution files and class diagrams (MIT). -->
+<language id="anvil-xml" name="XML" version="2.0" _section="Markup">
+  <metadata>
+    <property name="mimetypes">application/xml;text/xml</property>
+    <property name="globs">*.xml;*.csproj;*.slnx;*.cd;*.props;*.targets;*.config;*.resx;*.ruleset</property>
+    <property name="block-comment-start">&lt;!--</property>
+    <property name="block-comment-end">--&gt;</property>
+  </metadata>
+  <styles>
+    <style id="comment" name="Comment" map-to="def:comment"/>
+    <style id="tag" name="Tag" map-to="def:keyword"/>
+    <style id="attribute" name="Attribute" map-to="def:identifier"/>
+    <style id="value" name="Value" map-to="def:string"/>
+  </styles>
+  <definitions>
+    <context id="anvil-xml">
+      <include>
+        <context id="comment" style-ref="comment"><start>&lt;!--</start><end>--&gt;</end></context>
+        <context id="value" style-ref="value"><match>"[^"]*"|'[^']*'</match></context>
+        <context id="tag" style-ref="tag"><match>&lt;/?[?!]?[A-Za-z_][\w.:-]*|/?\??&gt;</match></context>
+        <context id="attribute" style-ref="attribute"><match>[A-Za-z_][\w.:-]*(?==)</match></context>
+      </include>
+    </context>
+  </definitions>
+</language>

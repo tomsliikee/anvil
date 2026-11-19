@@ -1,0 +1,19 @@
+[workspace]
+resolver = "3"
+members = ["anvil", "crates/anvil-core", "crates/anvil-lsp", "crates/anvil-dap", "crates/anvil-ai", "crates/anvil-git"]
+default-members = ["crates/anvil-core", "crates/anvil-lsp", "crates/anvil-dap", "crates/anvil-ai", "crates/anvil-git"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time", "process", "sync", "macros", "fs"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -1,0 +1,696 @@
+/* Rules of Anvil. Values come only from var(--im-…) (insights-mono/tokens.json
+   through anvil/build.rs). Durations: 120 ms hover, 200 ms state. */
+
+window.anvil {
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  background: var(--im-bg);
+}
+
+/* Splits: the air between two cards is the handle. Nothing is drawn. */
+paned.split > separator,
+paned.split > separator.wide {
+  background: none;
+  border: none;
+  box-shadow: none;
+  min-width: 10px;
+  min-height: 10px;
+}
+
+/* The menu bar sits in the header without a rule under it. */
+menubar {
+  box-shadow: none;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+menubar > item {
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* Code everywhere: Cascadia Mono, Visual Studio's own code font. */
+.mono,
+.code,
+.diag-code,
+.member,
+textview.output,
+textview.output > text {
+  font-family: "Cascadia Mono", "Geist Mono", monospace;
+}
+
+.tnum {
+  font-feature-settings: "tnum";
+}
+
+/* A statement: Geist Serif, only for statements (start page, empty states). */
+.statement {
+  font-family: "Geist Serif", serif;
+  font-size: 32px;
+  letter-spacing: -0.64px;
+  color: var(--im-ink);
+}
+
+.statement-small {
+  font-family: "Geist Serif", serif;
+  font-size: 20px;
+  letter-spacing: -0.2px;
+  color: var(--im-ink);
+}
+
+.hint {
+  font-size: 13.5px;
+  color: var(--im-ink2);
+}
+
+.dim {
+  color: var(--im-ink3);
+}
+
+.strong {
+  font-weight: 600;
+}
+
+.group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--im-ink2);
+}
+
+/* Panels are cards on the window's background: fill, no borders. */
+.card-panel {
+  background: var(--im-card);
+  border-radius: var(--im-radius-card);
+}
+
+.card-panel > stack,
+.card-panel scrolledwindow,
+.card-panel list,
+.card-panel listview,
+.card-panel columnview,
+.card-panel textview,
+.card-panel textview > text {
+  background: transparent;
+}
+
+.panel-header {
+  padding: 8px 10px 4px 14px;
+  min-height: 36px;
+}
+
+.panel-title {
+  font-family: "Geist Serif", serif;
+  font-size: 16px;
+  letter-spacing: -0.16px;
+  color: var(--im-ink);
+}
+
+/* Panel tabs: plain labels, the selected one heavier on a neutral tint. */
+.panel-tabs button {
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: var(--im-radius-pill);
+  background: transparent;
+  color: var(--im-ink2);
+  font-weight: 500;
+  font-size: 12.5px;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.panel-tabs button:hover {
+  background: color-mix(in srgb, var(--im-fill) 60%, transparent);
+}
+
+.panel-tabs button:checked {
+  background: var(--im-fill);
+  color: var(--im-ink);
+  font-weight: 600;
+}
+
+/* The run bar: a flat pill in the same tint as the other pills, centred
+   in the header. Build, Start, Start Without Debugging, Hot Reload, and the
+   debug controls while debugging. */
+.run-bar {
+  background: var(--im-fill);
+  border-radius: var(--im-radius-pill);
+  box-shadow: none;
+  padding: 2px;
+  margin: 0;
+}
+
+.run-bar button {
+  min-height: 28px;
+  min-width: 28px;
+  padding: 0 4px;
+  border-radius: var(--im-radius-pill);
+  background: transparent;
+  box-shadow: none;
+  color: var(--im-ink);
+  transition: background 120ms ease-out;
+}
+
+.run-bar button:hover {
+  background: color-mix(in srgb, var(--im-ink) 8%, transparent);
+}
+
+.run-bar button:active {
+  background: color-mix(in srgb, var(--im-ink) 14%, transparent);
+}
+
+.run-bar dropdown > button {
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+/* Start: the project's name with VS' green triangle, no fill of its own. */
+.run-bar button.start {
+  padding: 0 12px 0 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.run-bar button.start image.run-icon {
+  color: var(--im-up);
+  -gtk-icon-size: 13px;
+}
+
+.run-bar button.start spinner {
+  min-width: 13px;
+  min-height: 13px;
+}
+
+/* The buttons right of the run bar (AI, light/dark) share its height and
+   shape, so everything in the header sits on one centre line. */
+headerbar button.header-pill {
+  min-height: 28px;
+  min-width: 28px;
+  padding: 0 4px;
+  margin: 0 1px;
+  border-radius: var(--im-radius-pill);
+  background: transparent;
+  box-shadow: none;
+}
+
+headerbar button.header-pill:hover {
+  background: var(--im-fill);
+}
+
+headerbar button.header-pill:checked {
+  background: var(--im-fill);
+  color: var(--im-ink);
+}
+
+menubar > item {
+  min-height: 28px;
+}
+
+/* The header bar floats nothing: no line, no shadow under it. */
+headerbar {
+  box-shadow: none;
+  border-bottom: none;
+}
+
+/* The Class Designer's toolbox: a compact floating list. */
+.toolbox {
+  background: var(--im-bar);
+  border-radius: var(--im-radius-segmented);
+  box-shadow: var(--im-shadow-bar);
+  padding: 4px;
+}
+
+.toolbox button {
+  min-height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+/* The one solid button of a view (Start) and its quiet neighbours. */
+button.solid {
+  background: var(--im-solid);
+  color: var(--im-on-solid);
+  font-weight: 600;
+  padding: 0 18px;
+  border-radius: var(--im-radius-pill);
+}
+
+button.solid:backdrop,
+button.solid label,
+button.solid image {
+  background: var(--im-solid);
+  color: var(--im-on-solid);
+}
+
+button.solid label,
+button.solid image {
+  background: none;
+}
+
+button.solid:hover {
+  background: color-mix(in srgb, var(--im-solid) 86%, var(--im-bg));
+}
+
+button.quiet {
+  background: var(--im-fill);
+  color: var(--im-ink);
+  font-weight: 500;
+  padding: 0 18px;
+  min-height: 36px;
+  border-radius: var(--im-radius-pill);
+}
+
+button.quiet:hover {
+  background: color-mix(in srgb, var(--im-fill) 80%, var(--im-ink3));
+}
+
+button.solid:disabled,
+button.quiet:disabled {
+  opacity: 0.4;
+}
+
+/* Editor tabs: compact, inside the editor's card. */
+tabbar.editor-tabs,
+tabbar.editor-tabs > revealer > box {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+tabbar.editor-tabs > revealer > box {
+  padding: 6px 8px 2px 8px;
+  min-height: 0;
+}
+
+tabbar.editor-tabs tab {
+  border-radius: var(--im-radius-segmented);
+  font-size: 12.5px;
+  min-height: 28px;
+  padding: 0 2px;
+}
+
+/* libadwaita gives a tab at most 220 px and keeps room for the close
+   button on both sides of the centred title; small buttons leave the
+   name its length. */
+tabbar.editor-tabs tab button.tab-close-button,
+tabbar.editor-tabs tab button.tab-indicator {
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+  margin: 0;
+}
+
+tabbar.editor-tabs tab:hover {
+  background: color-mix(in srgb, var(--im-fill) 55%, transparent);
+}
+
+tabbar.editor-tabs tab:selected {
+  background: var(--im-fill);
+  font-weight: 600;
+}
+
+/* The preview tab (single click in the explorer) is set in ink3, as VS sets
+   it in italics: no colour, no italics (Inter is never italic). */
+tabbar.editor-tabs tab.preview label {
+  color: var(--im-ink2);
+}
+
+/* Code: Cascadia Mono, VS' default, without ligatures. Type and method
+   names are its cursive italic (a text tag), with the same advance, so
+   columns stay straight. */
+textview.editor,
+textview.editor > text {
+  font-family: "Cascadia Mono", "Geist Mono", monospace;
+  font-size: 13.5px;
+}
+
+textview.editor > gutter {
+  background: transparent;
+}
+
+/* Trees and lists: air instead of lines, neutral selection. */
+.tree > row,
+listview.tree > row {
+  min-height: 26px;
+  padding: 0 6px;
+  border-radius: 8px;
+  transition: background 120ms ease-out;
+}
+
+listview.tree > row:hover {
+  background: color-mix(in srgb, var(--im-fill) 55%, transparent);
+}
+
+listview.tree > row:selected {
+  background: var(--im-fill);
+  color: var(--im-ink);
+}
+
+listview.tree > row:selected label.name {
+  font-weight: 600;
+}
+
+listview.tree label.name {
+  font-size: 13px;
+}
+
+.tree-icon {
+  color: var(--im-ink2);
+}
+
+.project-name {
+  font-weight: 600;
+}
+
+/* Kind chips (`class`, `interface`) and counts. */
+.chip {
+  font-family: "Cascadia Mono", "Geist Mono", monospace;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: var(--im-radius-chip);
+  background: var(--im-fill);
+  color: var(--im-ink2);
+}
+
+.count {
+  font-size: 11.5px;
+  color: var(--im-ink3);
+  font-feature-settings: "tnum";
+}
+
+/* Error List: errors in `down`; warnings by shape and weight only. */
+columnview.diagnostics {
+  background: transparent;
+  font-size: 12.5px;
+}
+
+columnview.diagnostics > header > button {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--im-ink2);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 4px 10px;
+}
+
+columnview.diagnostics > listview > row > cell {
+  padding: 3px 10px;
+}
+
+columnview.diagnostics > listview > row:selected {
+  background: var(--im-fill);
+  color: var(--im-ink);
+}
+
+.sev-error {
+  color: var(--im-down);
+}
+
+.sev-warning {
+  color: var(--im-ink);
+  font-weight: 600;
+}
+
+.sev-info {
+  color: var(--im-ink3);
+}
+
+/* The Error List's row: counters, Filter, search, all 28 px high and
+   aligned with the panel tabs above (14 px from the card's edge). */
+.filter-bar {
+  margin-left: 4px;
+}
+
+.filter-bar menubutton > button,
+.filter-bar searchentry {
+  min-height: 28px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--im-radius-pill);
+}
+
+.filter-bar menubutton > button {
+  padding: 0 10px;
+  background: transparent;
+}
+
+.filter-bar menubutton > button:hover {
+  background: var(--im-fill);
+}
+
+.filter-toggle,
+.filter-toggle > button {
+  min-height: 28px;
+  font-weight: 500;
+  padding: 0 10px;
+  border-radius: var(--im-radius-pill);
+  font-size: 12px;
+  background: transparent;
+}
+
+.filter-toggle:checked {
+  background: var(--im-fill);
+  font-weight: 600;
+}
+
+/* Tests and diffs: the only other colours, for meaning. */
+.passed,
+.added {
+  color: var(--im-up);
+}
+
+.failed,
+.removed {
+  color: var(--im-down);
+}
+
+.skipped {
+  color: var(--im-ink3);
+}
+
+textview.diff,
+textview.diff > text {
+  font-family: "Cascadia Mono", "Geist Mono", monospace;
+  font-size: 12.5px;
+  background: transparent;
+}
+
+/* Status line under everything. */
+.statusbar {
+  padding: 2px 16px 6px 16px;
+  font-size: 11.5px;
+  color: var(--im-ink2);
+}
+
+.statusbar .chord {
+  font-weight: 600;
+  color: var(--im-ink);
+}
+
+/* Floating things: one shadow each. */
+.popup,
+popover.anvil > contents {
+  background: var(--im-bar);
+  box-shadow: var(--im-shadow-bar);
+  border-radius: var(--im-radius-segmented);
+}
+
+.find-bar {
+  background: var(--im-bar);
+  border-radius: var(--im-radius-search);
+  box-shadow: var(--im-shadow-bar);
+  padding: 6px;
+}
+
+.find-bar entry {
+  min-height: 32px;
+  border-radius: var(--im-radius-pill);
+}
+
+/* Search in Go To All / Settings → Keyboard. */
+.search-entry {
+  min-height: 40px;
+  border-radius: var(--im-radius-pill);
+  font-size: 15px;
+}
+
+list.results {
+  background: transparent;
+}
+
+list.results > row {
+  border-radius: 12px;
+  padding: 6px 12px;
+}
+
+list.results > row:selected {
+  background: var(--im-fill);
+  color: var(--im-ink);
+}
+
+/* Start page. */
+list.recent {
+  background: var(--im-card);
+  border-radius: var(--im-radius-segmented);
+}
+
+list.recent > row {
+  padding: 8px 14px;
+  border-radius: var(--im-radius-segmented);
+}
+
+.recent-path {
+  font-size: 11.5px;
+  color: var(--im-ink3);
+}
+
+/* Dialogs: the heading in Geist Serif, the default answer solid. */
+dialog.alert .heading-bin > label {
+  font-family: "Geist Serif", serif;
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: -0.3px;
+}
+
+dialog.alert button.suggested {
+  background: var(--im-solid);
+  color: var(--im-on-solid);
+}
+
+dialog.alert button.suggested:hover {
+  background: color-mix(in srgb, var(--im-solid) 86%, var(--im-bg));
+}
+
+/* Template list in New Item / New Project: a well with air around rows. */
+scrolledwindow.templates-scroll {
+  background: var(--im-card);
+  border-radius: 16px;
+}
+
+scrolledwindow.templates-scroll > undershoot.top,
+scrolledwindow.templates-scroll > undershoot.bottom {
+  background: none;
+  box-shadow: none;
+}
+
+list.templates {
+  background: transparent;
+  padding: 6px;
+}
+
+list.templates > row {
+  padding: 10px 14px;
+  margin: 1px 0;
+  border-radius: var(--im-radius-segmented);
+}
+
+list.templates > row:hover {
+  background: color-mix(in srgb, var(--im-fill) 55%, transparent);
+}
+
+list.templates > row:selected {
+  background: var(--im-fill);
+  color: var(--im-ink);
+}
+
+.template-title {
+  font-weight: 600;
+}
+
+/* Text fields inside panels (chat question, commit message). */
+textview.chat-input,
+textview.chat-input > text {
+  background: var(--im-fill);
+  border-radius: var(--im-radius-segmented);
+}
+
+/* Chat. */
+.chat-user {
+  background: var(--im-fill);
+  border-radius: var(--im-radius-segmented);
+  padding: 8px 12px;
+}
+
+.chat-assistant {
+  padding: 8px 4px;
+}
+
+/* Class Details: a quieter well under the diagram. */
+.details-panel {
+  background: color-mix(in srgb, var(--im-fill) 45%, var(--im-card));
+  padding-bottom: 6px;
+}
+
+.details-panel list.results > row:not(.activatable) {
+  background: none;
+}
+
+/* Debugger: the current line is a fill band (drawn by the editor). */
+.debug-active {
+  font-weight: 600;
+}
+
+/* Locals, Autos, Watch and DataTips: Name, Value, Type as in VS. */
+columnview.vars {
+  background: transparent;
+  font-size: 12.5px;
+}
+
+columnview.vars > header > button {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--im-ink2);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 4px 10px;
+}
+
+columnview.vars > listview > row > cell {
+  padding: 2px 10px;
+  min-height: 22px;
+}
+
+columnview.vars > listview > row:selected {
+  background: var(--im-fill);
+}
+
+/* A value that changed since the last stop: VS marks it red. */
+columnview.vars label.changed {
+  color: var(--im-down);
+  font-weight: 600;
+}
+
+.data-tip columnview.vars {
+  font-size: 12px;
+}
+
+/* Breakpoints window: VS' columns. */
+.bp-header {
+  padding: 4px 16px 4px 44px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--im-ink2);
+}
+
+list.breakpoints > row {
+  padding: 2px 10px;
+}
+
+list.breakpoints entry {
+  min-height: 26px;
+  font-size: 12px;
+}
+
+list.breakpoints dropdown > button {
+  min-height: 26px;
+  font-size: 12px;
+}
+
+/* Call Stack: the frame the windows show. */
+list.results > row.current-frame label {
+  font-weight: 700;
+}

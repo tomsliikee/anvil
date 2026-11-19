@@ -1,0 +1,5 @@
+/target
+/target-sdk
+/build-dir
+/.flatpak-builder
+/repo

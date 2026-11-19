@@ -1,0 +1,29 @@
+[package]
+name = "anvil"
+description = "A Visual-Studio-compatible C# IDE for Linux, in Insights Mono."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_18"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_7"] }
+sourceview5 = "0.11"
+vte4 = "0.10"
+cairo-rs = { version = "0.22", features = ["svg", "pdf", "png"] }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+lsp-types = "0.97"
+anvil-core = { path = "../crates/anvil-core" }
+anvil-lsp = { path = "../crates/anvil-lsp" }
+anvil-dap = { path = "../crates/anvil-dap" }
+anvil-ai = { path = "../crates/anvil-ai" }
+anvil-git = { path = "../crates/anvil-git" }
+
+[build-dependencies]
+anvil-core = { path = "../crates/anvil-core" }
+glib-build-tools = "0.22"

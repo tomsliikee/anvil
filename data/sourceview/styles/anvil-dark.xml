@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Anvil's code colours (Dark): a muted palette on the card ground of
+     insights-mono/tokens.json. Every colour reads at 4.5:1 or more on the
+     ground. Keywords, strings and comments come from the language
+     definition; anvil:type, anvil:method and anvil:property colour the
+     names Anvil finds in the syntax tree (set in Cascadia Mono Italic). -->
+<style-scheme id="anvil-dark" name="Anvil Dark" version="1.0">
+  <style name="text" foreground="#d8d8de" background="#161618"/>
+  <style name="selection" background="#2c3140"/>
+  <style name="cursor" foreground="#d8d8de"/>
+  <style name="current-line" background="#1d1d20"/>
+  <style name="line-numbers" foreground="#56565c" background="#161618"/>
+  <style name="current-line-number" foreground="#a1a1a6" background="#161618" bold="true"/>
+  <style name="background-pattern" background="#1d1d20"/>
+  <style name="draw-spaces" foreground="#2c2c30"/>
+  <style name="right-margin" foreground="#2c2c30"/>
+  <style name="bracket-match" background="#2c3140" bold="true"/>
+  <style name="search-match" background="#2c3140" bold="true"/>
+  <style name="snippet-focus" background="#1d1d20" underline="single"/>
+  <style name="def:keyword" foreground="#b9a3f2"/>
+  <style name="def:type" foreground="#b9a3f2"/>
+  <style name="def:function" foreground="#e2c387"/>
+  <style name="def:string" foreground="#a8d293"/>
+  <style name="def:special-char" foreground="#e8b47e"/>
+  <style name="def:character" foreground="#a8d293"/>
+  <style name="def:number" foreground="#efab80"/>
+  <style name="def:identifier" foreground="#d8d8de"/>
+  <style name="def:comment" foreground="#85858d" italic="true"/>
+  <style name="def:doc-comment-element" foreground="#85858d" bold="true"/>
+  <style name="def:preprocessor" foreground="#a1a1a6"/>
+  <style name="def:error" underline="error" underline-color="#ff8a80"/>
+  <style name="def:warning" underline="error" underline-color="#a1a1a6"/>
+  <style name="anvil:type" foreground="#7fcbc2" italic="true"/>
+  <style name="anvil:method" foreground="#e2c387" italic="true"/>
+  <style name="anvil:property" foreground="#9fc4ea"/>
+  <style name="diff:added-line" foreground="#7fd99a"/>
+  <style name="diff:removed-line" foreground="#ff8a80"/>
+  <style name="anvil-xml:tag" foreground="#7fcbc2"/>
+  <style name="anvil-xml:attribute" foreground="#9fc4ea"/>
+  <style name="anvil-xml:value" foreground="#a8d293"/>
+</style-scheme>

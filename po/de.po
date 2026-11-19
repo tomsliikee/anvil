@@ -1,0 +1,2443 @@
+# German translations for anvil package.
+# Copyright (C) 2026 THE anvil'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the anvil package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: anvil\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-19 08:09+0100\n"
+"PO-Revision-Date: 2026-11-18 23:10+0100\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: anvil/src/commands.rs:161
+#, rust-format
+msgid "({}) was pressed. Waiting for second key of chord..."
+msgstr "({}) wurde gedrückt. Warten auf die zweite Taste der Kombination..."
+
+#: anvil/src/commands.rs:166
+#, rust-format
+msgid "The key combination ({}) is not a command."
+msgstr "Die Tastenkombination ({}) ist kein Befehl."
+
+#: anvil/src/ui/actions.rs:140
+msgid "The AI chat is switched off (Tools → Settings → AI)."
+msgstr "Der KI-Chat ist ausgeschaltet (Extras → Einstellungen → KI)."
+
+#: anvil/src/ui/actions.rs:181
+msgid "Split view: drag a tab out to a second window."
+msgstr ""
+"Geteilte Ansicht: Ziehen Sie eine Registerkarte in ein zweites Fenster."
+
+#: anvil/src/ui/actions.rs:268
+msgid "All AI features are off."
+msgstr "Alle KI-Funktionen sind aus."
+
+#: anvil/src/ui/actions.rs:271
+msgid "not available here"
+msgstr "hier nicht verfügbar"
+
+#: anvil/src/ui/build.rs:71
+msgid "A build is already running."
+msgstr "Es wird bereits erstellt."
+
+#: anvil/src/ui/build.rs:76 anvil/src/ui/build.rs:160 anvil/src/ui/build.rs:277
+#: anvil/src/ui/debugger.rs:882 anvil/src/ui/git.rs:48 anvil/src/ui/nuget.rs:33
+msgid "Open a solution first."
+msgstr "Öffnen Sie zuerst eine Projektmappe."
+
+#: anvil/src/ui/build.rs:93
+#, rust-format
+msgid "Build started: {}"
+msgstr "Build gestartet: {}"
+
+#: anvil/src/ui/build.rs:94
+msgid "Build started…"
+msgstr "Build gestartet…"
+
+#: anvil/src/ui/build.rs:124
+msgid "Build canceled"
+msgstr "Build abgebrochen"
+
+#: anvil/src/ui/build.rs:126
+#, rust-format
+msgid "Build succeeded. {} warnings."
+msgstr "Build erfolgreich. {} Warnungen."
+
+#: anvil/src/ui/build.rs:128
+#, rust-format
+msgid "Build failed. {} errors, {} warnings."
+msgstr "Fehler beim Build. {} Fehler, {} Warnungen."
+
+#: anvil/src/ui/build.rs:213
+msgid ""
+"Hot Reload is not available while debugging (netcoredbg has no Edit and "
+"Continue)."
+msgstr ""
+"Hot Reload ist beim Debuggen nicht verfügbar (netcoredbg kennt kein "
+"Bearbeiten und Fortfahren)."
+
+#: anvil/src/ui/build.rs:221
+msgid "Hot Reload is on: saving a file applies the change."
+msgstr "Hot Reload ist aktiv: Speichern übernimmt die Änderung."
+
+#: anvil/src/ui/build.rs:266
+#, rust-format
+msgid "{} is now the first project."
+msgstr "{} ist jetzt das erste Projekt."
+
+#: anvil/src/ui/build.rs:268
+msgid "The solution could not be changed"
+msgstr "Die Projektmappe konnte nicht geändert werden"
+
+#: anvil/src/ui/build.rs:284
+#, rust-format
+msgid ""
+"Build: {} errors, {} warnings. The ZIP holds {} files, without bin, obj "
+"and .vs."
+msgstr ""
+"Build: {} Fehler, {} Warnungen. Das ZIP enthält {} Dateien, ohne bin, obj "
+"und .vs."
+
+#: anvil/src/ui/build.rs:285 anvil/src/ui/build.rs:298
+msgid "Hand in as ZIP"
+msgstr "Als ZIP abgeben"
+
+#: anvil/src/ui/build.rs:285
+msgid "The solution does not build"
+msgstr "Die Projektmappe lässt sich nicht erstellen"
+
+#: anvil/src/ui/build.rs:287 anvil/src/ui/debugger.rs:668
+#: anvil/src/ui/designer.rs:1255 anvil/src/ui/designer.rs:1385
+#: anvil/src/ui/dialogs.rs:128 anvil/src/ui/dialogs.rs:434
+#: anvil/src/ui/editor.rs:655 anvil/src/ui/editor.rs:1193
+#: anvil/src/ui/explorer.rs:467 anvil/src/ui/explorer.rs:517
+#: anvil/src/ui/find.rs:279 anvil/src/ui/git.rs:306 anvil/src/ui/git.rs:376
+#: anvil/src/ui/lsp.rs:752 anvil/src/ui/newitem.rs:78
+#: anvil/src/ui/properties.rs:93 anvil/src/ui/window.rs:441
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: anvil/src/ui/build.rs:287
+msgid "Save ZIP…"
+msgstr "ZIP speichern…"
+
+#: anvil/src/ui/build.rs:287
+msgid "Hand In Anyway…"
+msgstr "Trotzdem abgeben…"
+
+#: anvil/src/ui/build.rs:307
+#, rust-format
+msgid "{} written ({} files)."
+msgstr "{} geschrieben ({} Dateien)."
+
+#: anvil/src/ui/build.rs:308
+msgid "The ZIP could not be written"
+msgstr "Das ZIP konnte nicht geschrieben werden"
+
+#: anvil/src/ui/chat.rs:57
+msgid "Current file"
+msgstr "Aktuelle Datei"
+
+#: anvil/src/ui/chat.rs:59
+msgid "Selected error"
+msgstr "Ausgewählter Fehler"
+
+#: anvil/src/ui/chat.rs:60
+msgid "Ask"
+msgstr "Fragen"
+
+#: anvil/src/ui/chat.rs:111
+msgid "Only an Ollama on this machine (localhost) can be used."
+msgstr "Nur ein Ollama auf diesem Rechner (localhost) kann verwendet werden."
+
+#: anvil/src/ui/chat.rs:125
+msgid "Ollama has no models. Pull one with `ollama pull qwen2.5-coder`."
+msgstr ""
+"Ollama hat keine Modelle. Laden Sie eines mit `ollama pull qwen2.5-coder`."
+
+#: anvil/src/ui/chat.rs:148
+msgid "The AI chat is switched off."
+msgstr "Der KI-Chat ist ausgeschaltet."
+
+#: anvil/src/ui/chat.rs:232 anvil/src/ui/lsp.rs:752
+msgid "Apply"
+msgstr "Übernehmen"
+
+#: anvil/src/ui/chat.rs:234
+msgid "Reject"
+msgstr "Verwerfen"
+
+#: anvil/src/ui/chat.rs:249
+msgid "The change could not be applied"
+msgstr "Die Änderung konnte nicht übernommen werden"
+
+#: anvil/src/ui/chat.rs:269
+msgid "The file is not a text file."
+msgstr "Die Datei ist keine Textdatei."
+
+#: anvil/src/ui/chat.rs:271
+#, rust-format
+msgid "{} (the file changed since the answer)"
+msgstr "{} (die Datei hat sich seit der Antwort geändert)"
+
+#: anvil/src/ui/debugger.rs:103
+msgid "Add item to watch"
+msgstr "Element zur Überwachung hinzufügen"
+
+#: anvil/src/ui/debugger.rs:106
+msgid "Evaluate an expression"
+msgstr "Ausdruck auswerten"
+
+#: anvil/src/ui/debugger.rs:124 /tmp/tmp.qBiGGWFrBj.rs:84
+msgid "Locals"
+msgstr "Lokal"
+
+#: anvil/src/ui/debugger.rs:125 /tmp/tmp.qBiGGWFrBj.rs:85
+msgid "Autos"
+msgstr "Auto"
+
+#: anvil/src/ui/debugger.rs:126
+msgid "Watch 1"
+msgstr "Überwachen 1"
+
+#: anvil/src/ui/debugger.rs:127 /tmp/tmp.qBiGGWFrBj.rs:87
+msgid "Call Stack"
+msgstr "Aufrufliste"
+
+#: anvil/src/ui/debugger.rs:128
+msgid "Immediate Window"
+msgstr "Direktfenster"
+
+#: anvil/src/ui/debugger.rs:133 /tmp/tmp.qBiGGWFrBj.rs:89
+msgid "Breakpoints"
+msgstr "Haltepunkte"
+
+#: anvil/src/ui/debugger.rs:188
+msgid "The debugger is not stopped."
+msgstr "Der Debugger ist nicht angehalten."
+
+#: anvil/src/ui/debugger.rs:402
+msgid "Enabled"
+msgstr "Aktiviert"
+
+#: anvil/src/ui/debugger.rs:403 anvil/src/ui/debugger.rs:1153
+#, rust-format
+msgid "{}, line {}"
+msgstr "{}, Zeile {}"
+
+#: anvil/src/ui/debugger.rs:405
+msgid "Condition, e.g. i == 3"
+msgstr "Bedingung, z. B. i == 3"
+
+#: anvil/src/ui/debugger.rs:406
+msgid "Always"
+msgstr "Immer"
+
+#: anvil/src/ui/debugger.rs:406
+msgid "Hit count ="
+msgstr "Trefferanzahl ="
+
+#: anvil/src/ui/debugger.rs:406
+msgid "Hit count ≥"
+msgstr "Trefferanzahl ≥"
+
+#: anvil/src/ui/debugger.rs:406
+msgid "Multiple of"
+msgstr "Vielfaches von"
+
+#: anvil/src/ui/debugger.rs:418
+#, rust-format
+msgid "hit {}×"
+msgstr "{}× erreicht"
+
+#: anvil/src/ui/debugger.rs:419
+msgid "Times reached in this debugging session"
+msgstr "So oft in dieser Debugsitzung erreicht"
+
+#: anvil/src/ui/debugger.rs:422
+msgid "Delete Breakpoint"
+msgstr "Haltepunkt löschen"
+
+#: anvil/src/ui/debugger.rs:501
+msgid "No breakpoints. Click left of a line number or press F9 to set one."
+msgstr "Keine Haltepunkte. Klicken Sie links neben eine Zeilennummer oder drücken Sie F9, um einen zu setzen."
+
+#: anvil/src/ui/debugger.rs:527
+msgid "The debugger is starting…"
+msgstr "Der Debugger startet…"
+
+#: anvil/src/ui/debugger.rs:550 anvil/src/ui/debugger.rs:1033
+msgid "Running"
+msgstr "Wird ausgeführt"
+
+#: anvil/src/ui/debugger.rs:620
+msgid "QuickWatch"
+msgstr "Schnellüberwachung"
+
+#: anvil/src/ui/debugger.rs:628 /tmp/tmp.qBiGGWFrBj.rs:62
+msgid "Close"
+msgstr "Schließen"
+
+#: anvil/src/ui/debugger.rs:628
+msgid "Add Watch"
+msgstr "Überwachung hinzufügen"
+
+#: anvil/src/ui/debugger.rs:664 /tmp/tmp.qBiGGWFrBj.rs:90
+msgid "Exception Settings"
+msgstr "Ausnahmeeinstellungen"
+
+#: anvil/src/ui/debugger.rs:665
+msgid "Break when an exception is thrown (Common Language Runtime Exceptions)"
+msgstr ""
+"Unterbrechen, wenn eine Ausnahme ausgelöst wird (Common Language Runtime "
+"Exceptions)"
+
+#: anvil/src/ui/debugger.rs:668 anvil/src/ui/designer.rs:1255
+#: anvil/src/ui/dialogs.rs:434 anvil/src/ui/editor.rs:1193
+#: anvil/src/ui/explorer.rs:467 anvil/src/ui/git.rs:306
+#: anvil/src/ui/window.rs:652
+msgid "OK"
+msgstr "OK"
+
+#: anvil/src/ui/debugger.rs:706
+msgid "netcoredbg is not installed yet; start debugging once with F5."
+msgstr ""
+"netcoredbg ist noch nicht installiert; starten Sie das Debuggen einmal mit "
+"F5."
+
+#: anvil/src/ui/debugger.rs:710
+msgid "A debugging session is already running."
+msgstr "Es läuft bereits eine Debugsitzung."
+
+#: anvil/src/ui/debugger.rs:716
+msgid "The debugger could not attach"
+msgstr "Der Debugger konnte sich nicht anhängen"
+
+#: anvil/src/ui/debugger.rs:751 anvil/src/ui/designer.rs:1248
+#: anvil/src/ui/vartree.rs:134
+msgid "Name"
+msgstr "Name"
+
+#: anvil/src/ui/debugger.rs:751
+msgid "Condition"
+msgstr "Bedingung"
+
+#: anvil/src/ui/debugger.rs:751
+msgid "Hit Count"
+msgstr "Trefferanzahl"
+
+#: anvil/src/ui/debugger.rs:793
+msgid "Download the debugger?"
+msgstr "Debugger herunterladen?"
+
+#: anvil/src/ui/debugger.rs:794
+#, rust-format
+msgid ""
+"Debugging uses Samsung's netcoredbg {} (MIT licence, about 4 MB). Anvil "
+"downloads it once from GitHub into ~/.local/share/anvil/netcoredbg. "
+"Microsoft's own debugger may only be used in Microsoft products."
+msgstr ""
+"Zum Debuggen dient Samsungs netcoredbg {} (MIT-Lizenz, etwa 4 MB). Anvil "
+"lädt ihn einmal von GitHub nach ~/.local/share/anvil/netcoredbg. Microsofts "
+"eigener Debugger darf nur in Microsoft-Produkten verwendet werden."
+
+#: anvil/src/ui/debugger.rs:796 anvil/src/ui/lsp.rs:230
+msgid "Not Now"
+msgstr "Nicht jetzt"
+
+#: anvil/src/ui/debugger.rs:796 anvil/src/ui/lsp.rs:230
+msgid "Download"
+msgstr "Herunterladen"
+
+#: anvil/src/ui/debugger.rs:813
+msgid "Downloading netcoredbg…"
+msgstr "netcoredbg wird heruntergeladen…"
+
+#: anvil/src/ui/debugger.rs:836
+msgid "The download did not contain netcoredbg/netcoredbg."
+msgstr "Der Download enthielt kein netcoredbg/netcoredbg."
+
+#: anvil/src/ui/debugger.rs:853
+msgid "netcoredbg could not be downloaded"
+msgstr "netcoredbg konnte nicht heruntergeladen werden"
+
+#: anvil/src/ui/debugger.rs:871
+msgid "Preparing the debugger (once)…"
+msgstr "Debugger wird vorbereitet (einmalig)…"
+
+#: anvil/src/ui/debugger.rs:874
+msgid "The debugger's startup hook could not be built."
+msgstr "Der Start-Hook des Debuggers konnte nicht erstellt werden."
+
+#: anvil/src/ui/debugger.rs:886
+msgid "The startup project is not in the solution."
+msgstr "Das Startprojekt ist nicht in der Projektmappe."
+
+#: anvil/src/ui/debugger.rs:903
+msgid "The debugger did not start"
+msgstr "Der Debugger ist nicht gestartet"
+
+#: anvil/src/ui/debugger.rs:917
+#, rust-format
+msgid "The built program was not found at {}."
+msgstr "Das erstellte Programm wurde unter {} nicht gefunden."
+
+#: anvil/src/ui/debugger.rs:934
+msgid "Starting the program…"
+msgstr "Programm wird gestartet…"
+
+#: anvil/src/ui/debugger.rs:943
+msgid "The program ended before the debugger could attach. The terminal panel shows its output."
+msgstr "Das Programm wurde beendet, bevor sich der Debugger anhängen konnte. Das Terminal zeigt seine Ausgabe."
+
+#: anvil/src/ui/debugger.rs:946
+msgid "The program did not start within 30 seconds. The terminal panel shows its output."
+msgstr "Das Programm ist nicht innerhalb von 30 Sekunden gestartet. Das Terminal zeigt seine Ausgabe."
+
+#: anvil/src/ui/debugger.rs:1009
+#, rust-format
+msgid "netcoredbg did not answer {} within 15 seconds."
+msgstr "netcoredbg hat {} nicht innerhalb von 15 Sekunden beantwortet."
+
+#: anvil/src/ui/debugger.rs:1032
+msgid "Continue"
+msgstr "Weiter"
+
+#: anvil/src/ui/debugger.rs:1082
+#, rust-format
+msgid "The program has exited with code {}.\n"
+msgstr "Das Programm wurde mit Code {} beendet.\n"
+
+#: anvil/src/ui/debugger.rs:1171
+#, rust-format
+msgid "Exception thrown: {}"
+msgstr "Ausnahme ausgelöst: {}"
+
+#: anvil/src/ui/debugger.rs:1172
+msgid "Breakpoint hit"
+msgstr "Haltepunkt erreicht"
+
+#: anvil/src/ui/debugger.rs:1173
+msgid "Paused at the start of the program"
+msgstr "Am Programmstart angehalten"
+
+#: anvil/src/ui/debugger.rs:1174 anvil/src/ui/debugger.rs:1175
+msgid "Paused"
+msgstr "Angehalten"
+
+#: anvil/src/ui/debugger.rs:1253
+msgid "Debugging stopped"
+msgstr "Debuggen beendet"
+
+#: anvil/src/ui/designer.rs:535
+msgid "Right-click to add a class, or drag a .cs file here."
+msgstr ""
+"Rechtsklick fügt eine Klasse hinzu, oder ziehen Sie eine .cs-Datei hierher."
+
+#: anvil/src/ui/designer.rs:650
+msgid "not found in the code"
+msgstr "im Code nicht gefunden"
+
+#: anvil/src/ui/designer.rs:813 anvil/src/ui/designer.rs:821
+msgid "Fields"
+msgstr "Felder"
+
+#: anvil/src/ui/designer.rs:814 anvil/src/ui/designer.rs:822
+#: anvil/src/ui/properties.rs:52 anvil/src/ui/properties.rs:129
+#: anvil/src/ui/properties.rs:135 /tmp/tmp.qBiGGWFrBj.rs:106
+msgid "Properties"
+msgstr "Eigenschaften"
+
+#: anvil/src/ui/designer.rs:815 anvil/src/ui/designer.rs:823
+msgid "Methods"
+msgstr "Methoden"
+
+#: anvil/src/ui/designer.rs:816 anvil/src/ui/designer.rs:824
+msgid "Events"
+msgstr "Ereignisse"
+
+#: anvil/src/ui/designer.rs:842
+msgid "Nested Types"
+msgstr "Geschachtelte Typen"
+
+#: anvil/src/ui/designer.rs:1042
+msgid "The code could not be changed"
+msgstr "Der Code konnte nicht geändert werden"
+
+#: anvil/src/ui/designer.rs:1121 anvil/src/ui/designer.rs:1699
+msgid "Class Details"
+msgstr "Klassendetails"
+
+#: anvil/src/ui/designer.rs:1122
+msgid "Select a type to see and edit its members."
+msgstr "Wählen Sie einen Typ aus, um seine Member zu sehen und zu bearbeiten."
+
+#: anvil/src/ui/designer.rs:1126
+#, rust-format
+msgid "Class Details - {}"
+msgstr "Klassendetails - {}"
+
+#: anvil/src/ui/designer.rs:1223
+msgid "Add member"
+msgstr "Member hinzufügen"
+
+#: anvil/src/ui/designer.rs:1241
+#, rust-format
+msgid "New {}"
+msgstr "Neu: {}"
+
+#: anvil/src/ui/designer.rs:1250
+msgid "Access"
+msgstr "Zugriff"
+
+#: anvil/src/ui/designer.rs:1252
+msgid "File name"
+msgstr "Dateiname"
+
+#: anvil/src/ui/designer.rs:1265 anvil/src/ui/designer.rs:1275
+msgid "New type"
+msgstr "Neuer Typ"
+
+#: anvil/src/ui/designer.rs:1265 anvil/src/ui/dialogs.rs:191
+#: anvil/src/ui/explorer.rs:490
+#, rust-format
+msgid "{} already exists."
+msgstr "{} existiert bereits."
+
+#: anvil/src/ui/designer.rs:1325
+msgid ""
+"Use Quick Actions (Ctrl+.) on the interface name to implement its members."
+msgstr ""
+"Verwenden Sie Schnellaktionen (Strg+.) auf dem Schnittstellennamen, um die "
+"Member zu implementieren."
+
+#: anvil/src/ui/designer.rs:1328 anvil/src/ui/designer.rs:1681
+msgid "Inheritance"
+msgstr "Vererbung"
+
+#: anvil/src/ui/designer.rs:1338
+#, rust-format
+msgid "{} has no field or property of type {}."
+msgstr "{} hat kein Feld und keine Eigenschaft vom Typ {}."
+
+#: anvil/src/ui/designer.rs:1384 anvil/src/ui/explorer.rs:517
+#: anvil/src/ui/explorer.rs:528 /tmp/tmp.qBiGGWFrBj.rs:109
+msgid "Delete"
+msgstr "Löschen"
+
+#: anvil/src/ui/designer.rs:1384
+msgid ""
+"Remove the shape from the diagram only, or delete the type from the code too?"
+msgstr ""
+"Die Form nur aus dem Diagramm entfernen oder den Typ auch aus dem Code "
+"löschen?"
+
+#: anvil/src/ui/designer.rs:1385 anvil/src/ui/designer.rs:1514
+#: /tmp/tmp.qBiGGWFrBj.rs:114
+msgid "Delete Code"
+msgstr "Code löschen"
+
+#: anvil/src/ui/designer.rs:1385 anvil/src/ui/designer.rs:1528
+#: /tmp/tmp.qBiGGWFrBj.rs:113
+msgid "Remove from Diagram"
+msgstr "Aus Diagramm entfernen"
+
+#: anvil/src/ui/designer.rs:1446 anvil/src/ui/designer.rs:1451
+msgid "Export Diagram as Image"
+msgstr "Diagramm als Bild exportieren"
+
+#: anvil/src/ui/designer.rs:1453
+#, rust-format
+msgid "{} written."
+msgstr "{} geschrieben."
+
+#: anvil/src/ui/designer.rs:1490 anvil/src/ui/designer.rs:1571
+#: anvil/src/ui/explorer.rs:413 anvil/src/ui/explorer.rs:415
+#: anvil/src/ui/explorer.rs:446 anvil/src/ui/newitem.rs:78
+msgid "Add"
+msgstr "Hinzufügen"
+
+#: anvil/src/ui/designer.rs:1492
+msgid "Method"
+msgstr "Methode"
+
+#: anvil/src/ui/designer.rs:1493 /tmp/tmp.qBiGGWFrBj.rs:128
+msgid "Property"
+msgstr "Eigenschaft"
+
+#: anvil/src/ui/designer.rs:1494
+msgid "Field"
+msgstr "Feld"
+
+#: anvil/src/ui/designer.rs:1495
+msgid "Event"
+msgstr "Ereignis"
+
+#: anvil/src/ui/designer.rs:1496 /tmp/tmp.qBiGGWFrBj.rs:131
+msgid "Constructor"
+msgstr "Konstruktor"
+
+#: anvil/src/ui/designer.rs:1497 /tmp/tmp.qBiGGWFrBj.rs:132
+msgid "Destructor"
+msgstr "Destruktor"
+
+#: anvil/src/ui/designer.rs:1498
+msgid "Constant"
+msgstr "Konstante"
+
+#: anvil/src/ui/designer.rs:1512
+msgid "Show as Association"
+msgstr "Als Zuordnung anzeigen"
+
+#: anvil/src/ui/designer.rs:1513
+msgid "Show as Collection Association"
+msgstr "Als Auflistungszuordnung anzeigen"
+
+#: anvil/src/ui/designer.rs:1520
+msgid "View Code"
+msgstr "Code anzeigen"
+
+#: anvil/src/ui/designer.rs:1521
+msgid "Show Base Class"
+msgstr "Basisklasse anzeigen"
+
+#: anvil/src/ui/designer.rs:1522
+msgid "Show Derived Classes"
+msgstr "Abgeleitete Klassen anzeigen"
+
+#: anvil/src/ui/designer.rs:1523
+msgid "Expand"
+msgstr "Erweitern"
+
+#: anvil/src/ui/designer.rs:1523
+msgid "Collapse"
+msgstr "Reduzieren"
+
+#: anvil/src/ui/designer.rs:1541
+msgid "Comment"
+msgstr "Kommentar"
+
+#: anvil/src/ui/designer.rs:1573 anvil/src/ui/designer.rs:1661
+#: /tmp/tmp.qBiGGWFrBj.rs:159
+msgid "Class"
+msgstr "Klasse"
+
+#: anvil/src/ui/designer.rs:1574 anvil/src/ui/designer.rs:1662
+#: /tmp/tmp.qBiGGWFrBj.rs:161
+msgid "Enum"
+msgstr "Enumeration"
+
+#: anvil/src/ui/designer.rs:1575 anvil/src/ui/designer.rs:1663
+#: /tmp/tmp.qBiGGWFrBj.rs:160
+msgid "Interface"
+msgstr "Schnittstelle"
+
+#: anvil/src/ui/designer.rs:1576 anvil/src/ui/designer.rs:1664
+msgid "Abstract Class"
+msgstr "Abstrakte Klasse"
+
+#: anvil/src/ui/designer.rs:1577 anvil/src/ui/designer.rs:1665
+#: /tmp/tmp.qBiGGWFrBj.rs:162
+msgid "Struct"
+msgstr "Struktur"
+
+#: anvil/src/ui/designer.rs:1578 anvil/src/ui/designer.rs:1666
+#: /tmp/tmp.qBiGGWFrBj.rs:163
+msgid "Record"
+msgstr "Datensatz"
+
+#: anvil/src/ui/designer.rs:1579 anvil/src/ui/designer.rs:1667
+msgid "Delegate"
+msgstr "Delegat"
+
+#: anvil/src/ui/designer.rs:1584
+msgid "Change Members Format"
+msgstr "Memberformat ändern"
+
+#: anvil/src/ui/designer.rs:1584
+msgid "Display Name"
+msgstr "Name anzeigen"
+
+#: anvil/src/ui/designer.rs:1584
+msgid "Display Name and Type"
+msgstr "Name und Typ anzeigen"
+
+#: anvil/src/ui/designer.rs:1584
+msgid "Display Full Signature"
+msgstr "Vollständige Signatur anzeigen"
+
+#: anvil/src/ui/designer.rs:1585
+msgid "Group Members"
+msgstr "Member gruppieren"
+
+#: anvil/src/ui/designer.rs:1585
+msgid "By Kind"
+msgstr "Nach Art"
+
+#: anvil/src/ui/designer.rs:1585
+msgid "By Access"
+msgstr "Nach Zugriff"
+
+#: anvil/src/ui/designer.rs:1585
+msgid "Sort Alphabetically"
+msgstr "Alphabetisch sortieren"
+
+#: anvil/src/ui/designer.rs:1586 /tmp/tmp.qBiGGWFrBj.rs:115
+msgid "Layout Diagram"
+msgstr "Diagrammlayout"
+
+#: anvil/src/ui/designer.rs:1587
+msgid "Adjust Shapes Width"
+msgstr "Formbreite anpassen"
+
+#: anvil/src/ui/designer.rs:1589 /tmp/tmp.qBiGGWFrBj.rs:118
+msgid "Export Diagram as Image…"
+msgstr "Diagramm als Bild exportieren…"
+
+#: anvil/src/ui/designer.rs:1603
+msgid "The base class is not in this project."
+msgstr "Die Basisklasse ist nicht in diesem Projekt."
+
+#: anvil/src/ui/designer.rs:1603
+msgid "No derived classes in this project."
+msgstr "Keine abgeleiteten Klassen in diesem Projekt."
+
+#: anvil/src/ui/designer.rs:1681
+msgid "Association"
+msgstr "Zuordnung"
+
+#: anvil/src/ui/designer.rs:1687
+msgid "Click the first type, then the second."
+msgstr "Klicken Sie den ersten Typ an, dann den zweiten."
+
+#: anvil/src/ui/designer.rs:1767 /tmp/tmp.qBiGGWFrBj.rs:102
+#: /tmp/tmp.qBiGGWFrBj.rs:164
+msgid "Class Diagram"
+msgstr "Klassendiagramm"
+
+#: anvil/src/ui/designer.rs:1779 anvil/src/ui/properties.rs:46
+msgid "Select a project first."
+msgstr "Wählen Sie zuerst ein Projekt aus."
+
+#: anvil/src/ui/dialogs.rs:27
+msgid "Solution files"
+msgstr "Projektmappendateien"
+
+#: anvil/src/ui/dialogs.rs:28
+msgid "Project files"
+msgstr "Projektdateien"
+
+#: anvil/src/ui/dialogs.rs:29
+msgid "Open Project or Solution"
+msgstr "Projekt oder Projektmappe öffnen"
+
+#: anvil/src/ui/dialogs.rs:40
+msgid "Open Folder"
+msgstr "Ordner öffnen"
+
+#: anvil/src/ui/dialogs.rs:51
+msgid "Open File"
+msgstr "Datei öffnen"
+
+#: anvil/src/ui/dialogs.rs:74
+msgid "Console App"
+msgstr "Konsolen-App"
+
+#: anvil/src/ui/dialogs.rs:74
+msgid ""
+"A command-line application (.NET 10, Program.Main as in Visual Studio with "
+"\"Do not use top-level statements\")"
+msgstr ""
+"Eine Befehlszeilenanwendung (.NET 10, Program.Main wie in Visual Studio mit "
+"„Keine Anweisungen der obersten Ebene verwenden“)"
+
+#: anvil/src/ui/dialogs.rs:75
+msgid "Console App with StyleCop"
+msgstr "Konsolen-App mit StyleCop"
+
+#: anvil/src/ui/dialogs.rs:75
+msgid "As the course uses it: StyleCop.Analyzers 1.1.118 with default rules"
+msgstr "Wie im Kurs: StyleCop.Analyzers 1.1.118 mit Standardregeln"
+
+#: anvil/src/ui/dialogs.rs:76
+msgid "Class Library"
+msgstr "Klassenbibliothek"
+
+#: anvil/src/ui/dialogs.rs:76
+msgid "A library of classes for other projects"
+msgstr "Eine Bibliothek von Klassen für andere Projekte"
+
+#: anvil/src/ui/dialogs.rs:77
+msgid "MSTest Test Project"
+msgstr "MSTest-Testprojekt"
+
+#: anvil/src/ui/dialogs.rs:77
+msgid "Unit tests with MSTest"
+msgstr "Komponententests mit MSTest"
+
+#: anvil/src/ui/dialogs.rs:78
+msgid "xUnit Test Project"
+msgstr "xUnit-Testprojekt"
+
+#: anvil/src/ui/dialogs.rs:78
+msgid "Unit tests with xUnit"
+msgstr "Komponententests mit xUnit"
+
+#: anvil/src/ui/dialogs.rs:79
+msgid "NUnit Test Project"
+msgstr "NUnit-Testprojekt"
+
+#: anvil/src/ui/dialogs.rs:79
+msgid "Unit tests with NUnit"
+msgstr "Komponententests mit NUnit"
+
+#: anvil/src/ui/dialogs.rs:99
+msgid "Place solution and project in the same directory"
+msgstr "Projektmappe und Projekt im selben Verzeichnis platzieren"
+
+#: anvil/src/ui/dialogs.rs:101
+msgid "Project name"
+msgstr "Projektname"
+
+#: anvil/src/ui/dialogs.rs:104
+msgid "Location"
+msgstr "Speicherort"
+
+#: anvil/src/ui/dialogs.rs:126
+msgid "Add a new project"
+msgstr "Neues Projekt hinzufügen"
+
+#: anvil/src/ui/dialogs.rs:126 anvil/src/ui/start.rs:58
+msgid "Create a new project"
+msgstr "Neues Projekt erstellen"
+
+#: anvil/src/ui/dialogs.rs:128
+msgid "Create"
+msgstr "Erstellen"
+
+#: anvil/src/ui/dialogs.rs:142
+msgid "The project could not be created"
+msgstr "Das Projekt konnte nicht erstellt werden"
+
+#: anvil/src/ui/dialogs.rs:246
+msgid "file"
+msgstr "Datei"
+
+#: anvil/src/ui/dialogs.rs:272 /tmp/tmp.qBiGGWFrBj.rs:18
+msgid "Go To All"
+msgstr "Gehe zu allen"
+
+#: anvil/src/ui/dialogs.rs:395 anvil/src/ui/dialogs.rs:407
+msgid "Add Existing Item"
+msgstr "Vorhandenes Element hinzufügen"
+
+#: anvil/src/ui/dialogs.rs:430
+msgid "The solution has no other project."
+msgstr "Die Projektmappe hat kein weiteres Projekt."
+
+#: anvil/src/ui/dialogs.rs:432
+#, rust-format
+msgid "Reference Manager - {}"
+msgstr "Verweis-Manager - {}"
+
+#: anvil/src/ui/dialogs.rs:445
+msgid "Reference Manager"
+msgstr "Verweis-Manager"
+
+#: anvil/src/ui/dialogs.rs:467 /tmp/tmp.qBiGGWFrBj.rs:60
+msgid "Feature Search"
+msgstr "Featuresuche"
+
+#: anvil/src/ui/editor.rs:654
+#, rust-format
+msgid "Save changes to {}?"
+msgstr "Änderungen an {} speichern?"
+
+#: anvil/src/ui/editor.rs:655 anvil/src/ui/window.rs:441
+msgid "Don't Save"
+msgstr "Nicht speichern"
+
+#: anvil/src/ui/editor.rs:655 anvil/src/ui/properties.rs:93
+#: anvil/src/ui/window.rs:441 /tmp/tmp.qBiGGWFrBj.rs:5
+msgid "Save"
+msgstr "Speichern"
+
+#: anvil/src/ui/editor.rs:669 anvil/src/ui/editor.rs:772
+#: anvil/src/ui/editor.rs:787
+#, rust-format
+msgid "{} could not be saved"
+msgstr "{} konnte nicht gespeichert werden"
+
+#: anvil/src/ui/editor.rs:843
+msgid "The class diagram could not be opened"
+msgstr "Das Klassendiagramm konnte nicht geöffnet werden"
+
+#: anvil/src/ui/editor.rs:851
+#, rust-format
+msgid "{} could not be opened"
+msgstr "{} konnte nicht geöffnet werden"
+
+#: anvil/src/ui/editor.rs:976
+msgid "Breakpoint"
+msgstr "Haltepunkt"
+
+#: anvil/src/ui/editor.rs:977
+msgid "Disabled breakpoint"
+msgstr "Deaktivierter Haltepunkt"
+
+#: anvil/src/ui/editor.rs:978
+msgid "Breakpoint with a condition or hit count"
+msgstr "Haltepunkt mit Bedingung oder Trefferanzahl"
+
+#: anvil/src/ui/editor.rs:979
+msgid "The breakpoint will not currently be hit: no code was found at this line."
+msgstr "Der Haltepunkt wird derzeit nicht erreicht: In dieser Zeile wurde kein Code gefunden."
+
+#: anvil/src/ui/editor.rs:1186 /tmp/tmp.qBiGGWFrBj.rs:19
+msgid "Go To Line"
+msgstr "Gehe zu Zeile"
+
+#: anvil/src/ui/editor.rs:1186
+#, rust-format
+msgid "Line number (1 - {}):"
+msgstr "Zeilennummer (1 - {}):"
+
+#: anvil/src/ui/errorlist.rs:121
+msgid "Code"
+msgstr "Code"
+
+#: anvil/src/ui/errorlist.rs:125
+msgid "Description"
+msgstr "Beschreibung"
+
+#: anvil/src/ui/errorlist.rs:129
+msgid "Project"
+msgstr "Projekt"
+
+#: anvil/src/ui/errorlist.rs:130
+msgid "File"
+msgstr "Datei"
+
+#: anvil/src/ui/errorlist.rs:131
+msgid "Line"
+msgstr "Zeile"
+
+#: anvil/src/ui/errorlist.rs:135 anvil/src/ui/errorlist.rs:154
+msgid "Source"
+msgstr "Quelle"
+
+#: anvil/src/ui/errorlist.rs:135 anvil/src/ui/menus.rs:173
+msgid "IntelliSense"
+msgstr "IntelliSense"
+
+#: anvil/src/ui/errorlist.rs:135 anvil/src/ui/properties.rs:70
+msgid "Build"
+msgstr "Build"
+
+#: anvil/src/ui/errorlist.rs:146
+msgid "Show StyleCop (SA) warnings"
+msgstr "StyleCop-Warnungen (SA) anzeigen"
+
+#: anvil/src/ui/errorlist.rs:148
+msgid "Build + IntelliSense"
+msgstr "Build + IntelliSense"
+
+#: anvil/src/ui/errorlist.rs:148
+msgid "Build Only"
+msgstr "Nur Build"
+
+#: anvil/src/ui/errorlist.rs:148
+msgid "IntelliSense Only"
+msgstr "Nur IntelliSense"
+
+#: anvil/src/ui/errorlist.rs:157
+msgid "Filter"
+msgstr "Filter"
+
+#: anvil/src/ui/errorlist.rs:159
+msgid "Search Error List"
+msgstr "Fehlerliste durchsuchen"
+
+#: anvil/src/ui/errorlist.rs:222
+#, rust-format
+msgid "{} Error"
+msgid_plural "{} Errors"
+msgstr[0] "{} Fehler"
+msgstr[1] "{} Fehler"
+
+#: anvil/src/ui/errorlist.rs:223
+#, rust-format
+msgid "{} Warning"
+msgid_plural "{} Warnings"
+msgstr[0] "{} Warnung"
+msgstr[1] "{} Warnungen"
+
+#: anvil/src/ui/errorlist.rs:224
+#, rust-format
+msgid "{} Message"
+msgid_plural "{} Messages"
+msgstr[0] "{} Meldung"
+msgstr[1] "{} Meldungen"
+
+#: anvil/src/ui/errorlist.rs:305
+msgid "No errors."
+msgstr "Keine Fehler."
+
+#: anvil/src/ui/errorlist.rs:312
+#, rust-format
+msgid "{}: {}"
+msgstr "{}: {}"
+
+#: anvil/src/ui/explorer.rs:104
+msgid "Dependencies"
+msgstr "Abhängigkeiten"
+
+#: anvil/src/ui/explorer.rs:110
+msgid "Frameworks"
+msgstr "Frameworks"
+
+#: anvil/src/ui/explorer.rs:112
+msgid "Packages"
+msgstr "Pakete"
+
+#: anvil/src/ui/explorer.rs:115
+msgid "Projects"
+msgstr "Projekte"
+
+#: anvil/src/ui/explorer.rs:326
+#, rust-format
+msgid "Solution '{}'"
+msgstr "Projektmappe \"{}\""
+
+#: anvil/src/ui/explorer.rs:329
+#, rust-format
+msgid "({} of {} project)"
+msgid_plural "({} of {} projects)"
+msgstr[0] "({} von {} Projekt)"
+msgstr[1] "({} von {} Projekten)"
+
+#: anvil/src/ui/explorer.rs:425 anvil/src/ui/properties.rs:81
+msgid "Debug"
+msgstr "Debuggen"
+
+#: anvil/src/ui/explorer.rs:435
+msgid "Open"
+msgstr "Öffnen"
+
+#: anvil/src/ui/explorer.rs:453
+msgid "NewFolder"
+msgstr "NeuerOrdner"
+
+#: anvil/src/ui/explorer.rs:454 anvil/src/ui/explorer.rs:456
+#: /tmp/tmp.qBiGGWFrBj.rs:101
+msgid "New Folder"
+msgstr "Neuer Ordner"
+
+#: anvil/src/ui/explorer.rs:487 anvil/src/ui/explorer.rs:490
+#: anvil/src/ui/explorer.rs:494 anvil/src/ui/lsp.rs:749 anvil/src/ui/lsp.rs:768
+#: /tmp/tmp.qBiGGWFrBj.rs:108
+msgid "Rename"
+msgstr "Umbenennen"
+
+#: anvil/src/ui/explorer.rs:516
+#, rust-format
+msgid "'{}' will be deleted."
+msgstr "\"{}\" wird gelöscht."
+
+#: anvil/src/ui/explorer.rs:516
+msgid "It is moved to the trash."
+msgstr "Es wird in den Papierkorb verschoben."
+
+#: anvil/src/ui/explorer.rs:551 /tmp/tmp.qBiGGWFrBj.rs:110
+msgid "Exclude From Project"
+msgstr "Aus Projekt ausschließen"
+
+#: anvil/src/ui/find.rs:44 anvil/src/ui/find.rs:274
+msgid "Match case"
+msgstr "Groß-/Kleinschreibung beachten"
+
+#: anvil/src/ui/find.rs:46
+msgid "Match whole word"
+msgstr "Nur ganzes Wort suchen"
+
+#: anvil/src/ui/find.rs:48
+msgid "Use regular expressions"
+msgstr "Reguläre Ausdrücke verwenden"
+
+#: anvil/src/ui/find.rs:70 anvil/src/ui/find.rs:72 anvil/src/ui/find.rs:273
+#: /tmp/tmp.qBiGGWFrBj.rs:13
+msgid "Replace"
+msgstr "Ersetzen"
+
+#: anvil/src/ui/find.rs:73 anvil/src/ui/find.rs:279
+msgid "Replace All"
+msgstr "Alle ersetzen"
+
+#: anvil/src/ui/find.rs:220
+#, rust-format
+msgid "{} results"
+msgstr "{} Ergebnisse"
+
+#: anvil/src/ui/find.rs:270 /tmp/tmp.qBiGGWFrBj.rs:15
+msgid "Replace in Files"
+msgstr "In Dateien ersetzen"
+
+#: anvil/src/ui/find.rs:270 /tmp/tmp.qBiGGWFrBj.rs:14
+msgid "Find in Files"
+msgstr "In Dateien suchen"
+
+#: anvil/src/ui/find.rs:272 /tmp/tmp.qBiGGWFrBj.rs:12
+msgid "Find"
+msgstr "Suchen"
+
+#: anvil/src/ui/find.rs:279
+msgid "Find All"
+msgstr "Alle suchen"
+
+#: anvil/src/ui/find.rs:290
+#, rust-format
+msgid "Find \"{}\""
+msgstr "\"{}\" suchen"
+
+#: anvil/src/ui/git.rs:62 /tmp/tmp.qBiGGWFrBj.rs:120
+msgid "Fetch"
+msgstr "Abrufen"
+
+#: anvil/src/ui/git.rs:65 /tmp/tmp.qBiGGWFrBj.rs:121
+msgid "Pull"
+msgstr "Pull"
+
+#: anvil/src/ui/git.rs:68 /tmp/tmp.qBiGGWFrBj.rs:122
+msgid "Push"
+msgstr "Push"
+
+#: anvil/src/ui/git.rs:70
+msgid "View History"
+msgstr "Verlauf anzeigen"
+
+#: anvil/src/ui/git.rs:87
+msgid "Amend"
+msgstr "Ändern"
+
+#: anvil/src/ui/git.rs:88 /tmp/tmp.qBiGGWFrBj.rs:119
+msgid "Commit All"
+msgstr "Alle committen"
+
+#: anvil/src/ui/git.rs:100
+msgid "Staged Changes"
+msgstr "Bereitgestellte Änderungen"
+
+#: anvil/src/ui/git.rs:102
+msgid "Changes"
+msgstr "Änderungen"
+
+#: anvil/src/ui/git.rs:110
+msgid "This solution is not in a Git repository."
+msgstr "Diese Projektmappe liegt in keinem Git-Repository."
+
+#: anvil/src/ui/git.rs:111 /tmp/tmp.qBiGGWFrBj.rs:123
+msgid "Create Git Repository…"
+msgstr "Git-Repository erstellen…"
+
+#: anvil/src/ui/git.rs:149
+msgid "(detached)"
+msgstr "(getrennt)"
+
+#: anvil/src/ui/git.rs:167
+msgid "Switch to"
+msgstr "Wechseln zu"
+
+#: anvil/src/ui/git.rs:169
+msgid "New Branch…"
+msgstr "Neuer Branch…"
+
+#: anvil/src/ui/git.rs:170
+msgid "Merge into Current Branch…"
+msgstr "In aktuellen Branch mergen…"
+
+#: anvil/src/ui/git.rs:180
+msgid "Enter a commit message."
+msgstr "Geben Sie eine Commitnachricht ein."
+
+#: anvil/src/ui/git.rs:190 anvil/src/ui/git.rs:202
+msgid "Commit"
+msgstr "Commit"
+
+#: anvil/src/ui/git.rs:199
+msgid "Committed."
+msgstr "Committet."
+
+#: anvil/src/ui/git.rs:208
+#, rust-format
+msgid "git {}…"
+msgstr "git {}…"
+
+#: anvil/src/ui/git.rs:224
+#, rust-format
+msgid "git {} done."
+msgstr "git {} erledigt."
+
+#: anvil/src/ui/git.rs:237
+msgid "Create Git Repository"
+msgstr "Git-Repository erstellen"
+
+#: anvil/src/ui/git.rs:244
+msgid "Git repository created."
+msgstr "Git-Repository erstellt."
+
+#: anvil/src/ui/git.rs:266 anvil/src/ui/git.rs:267 /tmp/tmp.qBiGGWFrBj.rs:56
+msgid "Git Repository"
+msgstr "Git-Repository"
+
+#: anvil/src/ui/git.rs:286
+msgid "Switch Branch"
+msgstr "Branch wechseln"
+
+#: anvil/src/ui/git.rs:293
+msgid "New Branch"
+msgstr "Neuer Branch"
+
+#: anvil/src/ui/git.rs:295
+msgid "Merge into Current Branch"
+msgstr "In aktuellen Branch mergen"
+
+#: anvil/src/ui/git.rs:304
+msgid "Branch name"
+msgstr "Branchname"
+
+#: anvil/src/ui/git.rs:337
+msgid "Unstage"
+msgstr "Bereitstellung aufheben"
+
+#: anvil/src/ui/git.rs:337
+msgid "Stage"
+msgstr "Bereitstellen"
+
+#: anvil/src/ui/git.rs:344 anvil/src/ui/git.rs:386
+msgid "Git"
+msgstr "Git"
+
+#: anvil/src/ui/git.rs:355 anvil/src/ui/git.rs:376
+msgid "Undo Changes"
+msgstr "Änderungen rückgängig machen"
+
+#: anvil/src/ui/git.rs:375
+#, rust-format
+msgid "Undo the changes to {}?"
+msgstr "Änderungen an {} rückgängig machen?"
+
+#: anvil/src/ui/git.rs:375
+msgid "The file goes back to its last committed state. This cannot be undone."
+msgstr "Die Datei kehrt zum zuletzt committeten Stand zurück. Das lässt sich nicht rückgängig machen."
+
+#: anvil/src/ui/git.rs:438
+msgid "staged"
+msgstr "bereitgestellt"
+
+#: anvil/src/ui/git.rs:438
+msgid "working tree"
+msgstr "Arbeitsverzeichnis"
+
+#: anvil/src/ui/git.rs:438
+#, rust-format
+msgid "{} (HEAD) vs. {}"
+msgstr "{} (HEAD) und {}"
+
+#: anvil/src/ui/lsp.rs:157
+msgid "Language server starting…"
+msgstr "Sprachserver startet…"
+
+#: anvil/src/ui/lsp.rs:227
+msgid "Download the C# language server?"
+msgstr "C#-Sprachserver herunterladen?"
+
+#: anvil/src/ui/lsp.rs:228
+#, rust-format
+msgid ""
+"IntelliSense, squiggles, rename and quick actions come from Microsoft's "
+"Roslyn language server ({}, MIT licence, about 60 MB). Anvil downloads it "
+"once from Microsoft's package feed into ~/.local/share/anvil/roslyn."
+msgstr ""
+"IntelliSense, Wellenlinien, Umbenennen und Schnellaktionen kommen von "
+"Microsofts Roslyn-Sprachserver ({}, MIT-Lizenz, etwa 60 MB). Anvil lädt ihn "
+"einmal aus Microsofts Paketfeed nach ~/.local/share/anvil/roslyn."
+
+#: anvil/src/ui/lsp.rs:242
+msgid "Downloading the language server…"
+msgstr "Sprachserver wird heruntergeladen…"
+
+#: anvil/src/ui/lsp.rs:263 anvil/src/ui/lsp.rs:303 anvil/src/ui/lsp.rs:363
+msgid "Language server not available"
+msgstr "Sprachserver nicht verfügbar"
+
+#: anvil/src/ui/lsp.rs:264
+msgid "Download failed"
+msgstr "Download fehlgeschlagen"
+
+#: anvil/src/ui/lsp.rs:357 anvil/src/ui/lsp.rs:434
+msgid "Loading projects…"
+msgstr "Projekte werden geladen…"
+
+#: anvil/src/ui/lsp.rs:375
+msgid "Ready"
+msgstr "Bereit"
+
+#: anvil/src/ui/lsp.rs:426
+msgid "Restoring packages…"
+msgstr "Pakete werden wiederhergestellt…"
+
+#: anvil/src/ui/lsp.rs:449
+msgid "Language server stopped; restarting…"
+msgstr "Sprachserver beendet; wird neu gestartet…"
+
+#: anvil/src/ui/lsp.rs:453
+msgid "Language server stopped"
+msgstr "Sprachserver beendet"
+
+#: anvil/src/ui/lsp.rs:454
+msgid "The language server stopped. Tools > Restart Language Server starts it again."
+msgstr "Der Sprachserver wurde beendet. Extras > Sprachserver neu starten startet ihn wieder."
+
+#: anvil/src/ui/lsp.rs:636
+msgid "The language server is not ready yet."
+msgstr "Der Sprachserver ist noch nicht bereit."
+
+#: anvil/src/ui/lsp.rs:681 /tmp/tmp.qBiGGWFrBj.rs:42
+msgid "Go To Implementation"
+msgstr "Gehe zu Implementierung"
+
+#: anvil/src/ui/lsp.rs:682
+msgid "Cannot navigate to the symbol under the caret."
+msgstr "Zum Symbol unter dem Cursor kann nicht navigiert werden."
+
+#: anvil/src/ui/lsp.rs:696 /tmp/tmp.qBiGGWFrBj.rs:43
+msgid "Find All References"
+msgstr "Alle Verweise suchen"
+
+#: anvil/src/ui/lsp.rs:749
+#, rust-format
+msgid "New name for {}:"
+msgstr "Neuer Name für {}:"
+
+#: anvil/src/ui/lsp.rs:798
+msgid "No quick actions here."
+msgstr "Hier gibt es keine Schnellaktionen."
+
+#: anvil/src/ui/lsp.rs:1316
+msgid "Cut"
+msgstr "Ausschneiden"
+
+#: anvil/src/ui/lsp.rs:1317
+msgid "Copy"
+msgstr "Kopieren"
+
+#: anvil/src/ui/lsp.rs:1318
+msgid "Paste"
+msgstr "Einfügen"
+
+#: anvil/src/ui/menus.rs:152
+msgid "_File"
+msgstr "_Datei"
+
+#: anvil/src/ui/menus.rs:154
+msgid "_Edit"
+msgstr "_Bearbeiten"
+
+#: anvil/src/ui/menus.rs:167
+msgid "Advanced"
+msgstr "Erweitert"
+
+#: anvil/src/ui/menus.rs:174
+msgid "Refactor"
+msgstr "Umgestalten"
+
+#: anvil/src/ui/menus.rs:178
+msgid "_View"
+msgstr "_Ansicht"
+
+#: anvil/src/ui/menus.rs:199
+msgid "_Project"
+msgstr "_Projekt"
+
+#: anvil/src/ui/menus.rs:216
+msgid "_Build"
+msgstr "_Erstellen"
+
+#: anvil/src/ui/menus.rs:218
+msgid "_Debug"
+msgstr "_Debuggen"
+
+#: anvil/src/ui/menus.rs:236
+msgid "Windows"
+msgstr "Fenster"
+
+#: anvil/src/ui/menus.rs:240
+msgid "_Test"
+msgstr "_Test"
+
+#: anvil/src/ui/menus.rs:241
+msgid "_Git"
+msgstr "_Git"
+
+#: anvil/src/ui/menus.rs:242
+msgid "_Tools"
+msgstr "E_xtras"
+
+#: anvil/src/ui/menus.rs:243
+msgid "_Help"
+msgstr "_Hilfe"
+
+#: anvil/src/ui/newitem.rs:16
+msgid "An empty class definition"
+msgstr "Eine leere Klassendefinition"
+
+#: anvil/src/ui/newitem.rs:17
+msgid "An empty interface definition"
+msgstr "Eine leere Schnittstellendefinition"
+
+#: anvil/src/ui/newitem.rs:18
+msgid "An empty enumeration"
+msgstr "Eine leere Enumeration"
+
+#: anvil/src/ui/newitem.rs:19
+msgid "An empty structure definition"
+msgstr "Eine leere Strukturdefinition"
+
+#: anvil/src/ui/newitem.rs:20
+msgid "An empty record definition"
+msgstr "Eine leere Datensatzdefinition"
+
+#: anvil/src/ui/newitem.rs:21
+msgid "A diagram of the classes of the project (.cd)"
+msgstr "Ein Diagramm der Klassen des Projekts (.cd)"
+
+#: anvil/src/ui/newitem.rs:22
+msgid "A class with an MSTest test method"
+msgstr "Eine Klasse mit einer MSTest-Testmethode"
+
+#: anvil/src/ui/newitem.rs:23
+msgid "A class with NUnit set-up and test methods"
+msgstr "Eine Klasse mit NUnit-Setup- und Testmethoden"
+
+#: anvil/src/ui/newitem.rs:24
+msgid "An empty JSON file"
+msgstr "Eine leere JSON-Datei"
+
+#: anvil/src/ui/newitem.rs:25
+msgid "An empty text file"
+msgstr "Eine leere Textdatei"
+
+#: anvil/src/ui/newitem.rs:26
+msgid "The .NET code style settings file"
+msgstr "Die Datei mit den .NET-Codeformateinstellungen"
+
+#: anvil/src/ui/newitem.rs:33
+msgid "Select a project in the Solution Explorer first."
+msgstr "Wählen Sie zuerst ein Projekt im Projektmappen-Explorer aus."
+
+#: anvil/src/ui/newitem.rs:70
+msgid "Name:"
+msgstr "Name:"
+
+#: anvil/src/ui/newitem.rs:76
+#, rust-format
+msgid "Add New Item - {}"
+msgstr "Neues Element hinzufügen - {}"
+
+#: anvil/src/ui/newitem.rs:111 anvil/src/ui/newitem.rs:121
+msgid "Add New Item"
+msgstr "Neues Element hinzufügen"
+
+#: anvil/src/ui/newitem.rs:111
+#, rust-format
+msgid "A file with the name '{}' already exists."
+msgstr "Eine Datei mit dem Namen \"{}\" ist bereits vorhanden."
+
+#: anvil/src/ui/nuget.rs:40
+msgid "Search (nuget.org)"
+msgstr "Suchen (nuget.org)"
+
+#: anvil/src/ui/nuget.rs:41
+msgid "Include prerelease"
+msgstr "Vorabversion einbeziehen"
+
+#: anvil/src/ui/nuget.rs:54
+msgid "Browse"
+msgstr "Durchsuchen"
+
+#: anvil/src/ui/nuget.rs:55
+msgid "Installed"
+msgstr "Installiert"
+
+#: anvil/src/ui/nuget.rs:56
+msgid "Updates"
+msgstr "Updates"
+
+#: anvil/src/ui/nuget.rs:62 anvil/src/ui/nuget.rs:95
+msgid "Install"
+msgstr "Installieren"
+
+#: anvil/src/ui/nuget.rs:64
+msgid "Uninstall"
+msgstr "Deinstallieren"
+
+#: anvil/src/ui/nuget.rs:87
+#, rust-format
+msgid "NuGet - {}"
+msgstr "NuGet - {}"
+
+#: anvil/src/ui/nuget.rs:95
+msgid "Update"
+msgstr "Aktualisieren"
+
+#: anvil/src/ui/nuget.rs:200
+#, rust-format
+msgid "{} installed."
+msgstr "{} installiert."
+
+#: anvil/src/ui/nuget.rs:204 anvil/src/ui/nuget.rs:221
+msgid "NuGet"
+msgstr "NuGet"
+
+#: anvil/src/ui/nuget.rs:217
+#, rust-format
+msgid "{} uninstalled."
+msgstr "{} deinstalliert."
+
+#: anvil/src/ui/nuget.rs:227
+#, rust-format
+msgid "Package sources: {}"
+msgstr "Paketquellen: {}"
+
+#: anvil/src/ui/output.rs:25
+msgid "Clear All"
+msgstr "Alles löschen"
+
+#: anvil/src/ui/output.rs:29
+msgid "Show output from:"
+msgstr "Ausgabe anzeigen von:"
+
+#: anvil/src/ui/properties.rs:28
+msgid "(Default)"
+msgstr "(Standard)"
+
+#: anvil/src/ui/properties.rs:52
+msgid "The project file could not be read."
+msgstr "Die Projektdatei konnte nicht gelesen werden."
+
+#: anvil/src/ui/properties.rs:61
+msgid "Application"
+msgstr "Anwendung"
+
+#: anvil/src/ui/properties.rs:62
+msgid "Target framework"
+msgstr "Zielframework"
+
+#: anvil/src/ui/properties.rs:63
+msgid "Output type"
+msgstr "Ausgabetyp"
+
+#: anvil/src/ui/properties.rs:64
+msgid "Default namespace"
+msgstr "Standardnamespace"
+
+#: anvil/src/ui/properties.rs:65
+msgid "Assembly name"
+msgstr "Assemblyname"
+
+#: anvil/src/ui/properties.rs:71
+msgid "Nullable"
+msgstr "Nullable"
+
+#: anvil/src/ui/properties.rs:72
+msgid "Implicit global usings"
+msgstr "Implizite globale Using-Direktiven"
+
+#: anvil/src/ui/properties.rs:74
+msgid "Treat warnings as errors"
+msgstr "Warnungen als Fehler behandeln"
+
+#: anvil/src/ui/properties.rs:76
+msgid "Suppress specific warnings"
+msgstr "Bestimmte Warnungen unterdrücken"
+
+#: anvil/src/ui/properties.rs:84
+msgid "Command line arguments"
+msgstr "Befehlszeilenargumente"
+
+#: anvil/src/ui/properties.rs:91
+#, rust-format
+msgid "{} Properties"
+msgstr "{}-Eigenschaften"
+
+#: anvil/src/ui/settings.rs:39
+msgid "General"
+msgstr "Allgemein"
+
+#: anvil/src/ui/settings.rs:41
+msgid "Language"
+msgstr "Sprache"
+
+#: anvil/src/ui/settings.rs:41
+msgid "System"
+msgstr "System"
+
+#: anvil/src/ui/settings.rs:42
+msgid "Takes effect after a restart."
+msgstr "Wirkt nach einem Neustart."
+
+#: anvil/src/ui/settings.rs:44
+msgid "Appearance"
+msgstr "Darstellung"
+
+#: anvil/src/ui/settings.rs:44
+msgid "Follow System"
+msgstr "Wie das System"
+
+#: anvil/src/ui/settings.rs:44
+msgid "Light"
+msgstr "Hell"
+
+#: anvil/src/ui/settings.rs:44
+msgid "Dark"
+msgstr "Dunkel"
+
+#: anvil/src/ui/settings.rs:45
+msgid "Format of new solutions"
+msgstr "Format neuer Projektmappen"
+
+#: anvil/src/ui/settings.rs:51
+msgid "Editor"
+msgstr "Editor"
+
+#: anvil/src/ui/settings.rs:53
+msgid "Word wrap"
+msgstr "Zeilenumbruch"
+
+#: anvil/src/ui/settings.rs:54
+msgid "View white space"
+msgstr "Leerraum anzeigen"
+
+#: anvil/src/ui/settings.rs:55
+msgid "Show StyleCop rules in the Error List"
+msgstr "StyleCop-Regeln in der Fehlerliste anzeigen"
+
+#: anvil/src/ui/settings.rs:63 anvil/src/ui/window.rs:141
+msgid "AI"
+msgstr "KI"
+
+#: anvil/src/ui/settings.rs:65
+msgid ""
+"Local models through Ollama only. Nothing leaves this machine. Both parts "
+"are off by default; the master switch turns everything off for exams."
+msgstr ""
+"Nur lokale Modelle über Ollama. Nichts verlässt diesen Rechner. Beide Teile "
+"sind standardmäßig aus; der Hauptschalter schaltet für Prüfungen alles ab."
+
+#: anvil/src/ui/settings.rs:66
+msgid "AI features"
+msgstr "KI-Funktionen"
+
+#: anvil/src/ui/settings.rs:67
+msgid "Inline completion (Tab accepts)"
+msgstr "Inline-Vervollständigung (Tab übernimmt)"
+
+#: anvil/src/ui/settings.rs:68
+msgid "Chat panel"
+msgstr "Chatbereich"
+
+#: anvil/src/ui/settings.rs:70
+msgid "Model for inline completion (empty: the first coder model)"
+msgstr "Modell für die Inline-Vervollständigung (leer: das erste Coder-Modell)"
+
+#: anvil/src/ui/settings.rs:74
+msgid "Ollama address"
+msgstr "Ollama-Adresse"
+
+#: anvil/src/ui/settings.rs:82
+msgid "Tools"
+msgstr "Extras"
+
+#: anvil/src/ui/settings.rs:85
+msgid "C# language server (Roslyn)"
+msgstr "C#-Sprachserver (Roslyn)"
+
+#: anvil/src/ui/settings.rs:85 anvil/src/ui/settings.rs:86
+#, rust-format
+msgid "{} installed"
+msgstr "{} installiert"
+
+#: anvil/src/ui/settings.rs:85
+msgid "Not installed; downloaded on first use"
+msgstr "Nicht installiert; wird beim ersten Gebrauch heruntergeladen"
+
+#: anvil/src/ui/settings.rs:86
+msgid "Debugger (netcoredbg)"
+msgstr "Debugger (netcoredbg)"
+
+#: anvil/src/ui/settings.rs:86
+msgid "Not installed; downloaded on first F5"
+msgstr "Nicht installiert; wird beim ersten F5 heruntergeladen"
+
+#: anvil/src/ui/settings.rs:89
+msgid ".NET SDK"
+msgstr ".NET SDK"
+
+#: anvil/src/ui/settings.rs:89
+msgid "Checking…"
+msgstr "Wird geprüft…"
+
+#: anvil/src/ui/settings.rs:107
+msgid "Keyboard"
+msgstr "Tastatur"
+
+#: anvil/src/ui/settings.rs:109
+msgid ""
+"Visual Studio's default scheme for C#. Click a shortcut and press new keys; "
+"a chord takes two presses. Backspace removes, Escape cancels."
+msgstr ""
+"Das Standardschema von Visual Studio für C#. Klicken Sie auf eine "
+"Tastenkombination und drücken Sie neue Tasten; eine Akkordkombination "
+"braucht zwei. Rücktaste entfernt, Esc bricht ab."
+
+#: anvil/src/ui/settings.rs:110
+msgid "Search commands or keys (e.g. Ctrl+K)"
+msgstr "Befehle oder Tasten suchen (z. B. Ctrl+K)"
+
+#: anvil/src/ui/settings.rs:114
+msgid "Reset to Visual Studio defaults"
+msgstr "Auf Visual-Studio-Standard zurücksetzen"
+
+#: anvil/src/ui/settings.rs:134
+msgid "(none)"
+msgstr "(keine)"
+
+#: anvil/src/ui/settings.rs:138
+msgid "No conflicts."
+msgstr "Keine Konflikte."
+
+#: anvil/src/ui/settings.rs:138
+#, rust-format
+msgid "{} is bound to {} and {}"
+msgstr "{} ist {} und {} zugeordnet"
+
+#: anvil/src/ui/settings.rs:181
+msgid "Press the new shortcut…"
+msgstr "Neue Tastenkombination drücken…"
+
+#: anvil/src/ui/settings.rs:252 /tmp/tmp.qBiGGWFrBj.rs:124
+msgid "Settings"
+msgstr "Einstellungen"
+
+#: anvil/src/ui/start.rs:43
+msgid "Write it here. Hand it in anywhere."
+msgstr "Hier schreiben. Überall abgeben."
+
+#: anvil/src/ui/start.rs:47
+msgid "Open recent"
+msgstr "Zuletzt geöffnet"
+
+#: anvil/src/ui/start.rs:51
+msgid "No solutions opened yet."
+msgstr "Noch keine Projektmappe geöffnet."
+
+#: anvil/src/ui/start.rs:55
+msgid "Get started"
+msgstr "Erste Schritte"
+
+#: anvil/src/ui/start.rs:56
+msgid "Open a project or solution"
+msgstr "Projekt oder Projektmappe öffnen"
+
+#: anvil/src/ui/start.rs:56
+msgid "Open a .slnx or .sln written by Visual Studio"
+msgstr "Eine von Visual Studio geschriebene .slnx oder .sln öffnen"
+
+#: anvil/src/ui/start.rs:57
+msgid "Open a local folder"
+msgstr "Lokalen Ordner öffnen"
+
+#: anvil/src/ui/start.rs:57
+msgid "A folder that holds one solution"
+msgstr "Ein Ordner mit einer Projektmappe"
+
+#: anvil/src/ui/start.rs:58
+msgid "Console App, with StyleCop as in the course, or a test project"
+msgstr "Konsolen-App, mit StyleCop wie im Kurs, oder ein Testprojekt"
+
+#: anvil/src/ui/status.rs:62
+#, rust-format
+msgid "Ln {}, Col {}"
+msgstr "Z {}, Sp {}"
+
+#: anvil/src/ui/terminal.rs:91
+msgid "Could not start"
+msgstr "Konnte nicht starten"
+
+#: anvil/src/ui/terminal.rs:110
+msgid "The program exited with code $code."
+msgstr "Das Programm wurde mit Code $code beendet."
+
+#: anvil/src/ui/terminal.rs:111
+msgid "Press any key to close this window . . ."
+msgstr "Drücken Sie eine beliebige Taste, um dieses Fenster zu schließen . . ."
+
+#: anvil/src/ui/tests.rs:37
+msgid "Run All"
+msgstr "Alle ausführen"
+
+#: anvil/src/ui/tests.rs:37
+msgid "Run Failed"
+msgstr "Fehlerhafte ausführen"
+
+#: anvil/src/ui/tests.rs:37 /tmp/tmp.qBiGGWFrBj.rs:96
+msgid "Repeat Last Run"
+msgstr "Letzte Ausführung wiederholen"
+
+#: anvil/src/ui/tests.rs:37
+msgid "Debug All"
+msgstr "Alle debuggen"
+
+#: anvil/src/ui/tests.rs:44
+msgid "Run"
+msgstr "Ausführen"
+
+#: anvil/src/ui/tests.rs:150
+msgid "No tests found. Add an MSTest, xUnit or NUnit project."
+msgstr ""
+"Keine Tests gefunden. Fügen Sie ein MSTest-, xUnit- oder NUnit-Projekt hinzu."
+
+#: anvil/src/ui/tests.rs:150
+#, rust-format
+msgid "{} tests · {} passed · {} failed"
+msgstr "{} Tests · {} bestanden · {} fehlgeschlagen"
+
+#: anvil/src/ui/tests.rs:161
+msgid "No tests found."
+msgstr "Keine Tests gefunden."
+
+#: anvil/src/ui/tests.rs:178
+msgid "No failed tests."
+msgstr "Keine fehlgeschlagenen Tests."
+
+#: anvil/src/ui/tests.rs:208
+msgid "No test here."
+msgstr "Hier ist kein Test."
+
+#: anvil/src/ui/tests.rs:257
+#, rust-format
+msgid "Running tests of {}…"
+msgstr "Tests von {} werden ausgeführt…"
+
+#: anvil/src/ui/tests.rs:307
+#, rust-format
+msgid "The tests of {} did not build."
+msgstr "Die Tests von {} ließen sich nicht erstellen."
+
+#: anvil/src/ui/tests.rs:314
+msgid "Test run finished"
+msgstr "Testlauf beendet"
+
+#: anvil/src/ui/vartree.rs:138
+msgid "Value"
+msgstr "Wert"
+
+#: anvil/src/ui/vartree.rs:149
+msgid "Type"
+msgstr "Typ"
+
+#: anvil/src/ui/watch.rs:168
+#, rust-format
+msgid "{} was changed outside Anvil"
+msgstr "{} wurde außerhalb von Anvil geändert"
+
+#: anvil/src/ui/watch.rs:168
+msgid "This file has unsaved changes in Anvil too. Reload it and lose them, or keep Anvil's version?"
+msgstr "Diese Datei hat auch in Anvil ungespeicherte Änderungen. Neu laden und sie verwerfen, oder die Fassung in Anvil behalten?"
+
+#: anvil/src/ui/watch.rs:169
+msgid "Keep Mine"
+msgstr "Meine behalten"
+
+#: anvil/src/ui/watch.rs:169
+msgid "Reload"
+msgstr "Neu laden"
+
+#: anvil/src/ui/window.rs:107
+msgid "Startup Project"
+msgstr "Startprojekt"
+
+#: anvil/src/ui/window.rs:112 anvil/src/ui/window.rs:612
+msgid "Start"
+msgstr "Starten"
+
+#: anvil/src/ui/window.rs:231 /tmp/tmp.qBiGGWFrBj.rs:59
+msgid "Light or Dark"
+msgstr "Hell oder dunkel"
+
+#: anvil/src/ui/window.rs:258 /tmp/tmp.qBiGGWFrBj.rs:51
+msgid "Error List"
+msgstr "Fehlerliste"
+
+#: anvil/src/ui/window.rs:259 /tmp/tmp.qBiGGWFrBj.rs:52
+msgid "Output"
+msgstr "Ausgabe"
+
+#: anvil/src/ui/window.rs:260 /tmp/tmp.qBiGGWFrBj.rs:53
+msgid "Terminal"
+msgstr "Terminal"
+
+#: anvil/src/ui/window.rs:261 /tmp/tmp.qBiGGWFrBj.rs:54
+msgid "Test Explorer"
+msgstr "Test-Explorer"
+
+#: anvil/src/ui/window.rs:262
+msgid "Find Results"
+msgstr "Suchergebnisse"
+
+#: anvil/src/ui/window.rs:279 /tmp/tmp.qBiGGWFrBj.rs:50
+msgid "Solution Explorer"
+msgstr "Projektmappen-Explorer"
+
+#: anvil/src/ui/window.rs:280 /tmp/tmp.qBiGGWFrBj.rs:55
+msgid "Git Changes"
+msgstr "Git-Änderungen"
+
+#: anvil/src/ui/window.rs:281 /tmp/tmp.qBiGGWFrBj.rs:57
+msgid "AI Chat"
+msgstr "KI-Chat"
+
+#: anvil/src/ui/window.rs:440
+msgid "Save changes?"
+msgstr "Änderungen speichern?"
+
+#: anvil/src/ui/window.rs:473
+msgid "Could not save the session state"
+msgstr "Der Sitzungszustand konnte nicht gespeichert werden"
+
+#: anvil/src/ui/window.rs:484
+msgid "This folder holds no .slnx or .sln."
+msgstr "Dieser Ordner enthält keine .slnx oder .sln."
+
+#: anvil/src/ui/window.rs:499
+msgid "No solution found for this project."
+msgstr "Für dieses Projekt wurde keine Projektmappe gefunden."
+
+#: anvil/src/ui/window.rs:524
+msgid "The solution could not be opened"
+msgstr "Die Projektmappe konnte nicht geöffnet werden"
+
+#: anvil/src/ui/window.rs:556
+msgid "The .NET SDK was not found"
+msgstr "Das .NET SDK wurde nicht gefunden"
+
+#: anvil/src/ui/window.rs:556
+msgid ""
+"Anvil builds, runs and analyses with the host's dotnet. Install the .NET 10 "
+"SDK from your distribution (for example `sudo dnf install dotnet-sdk-10.0`)."
+msgstr ""
+"Anvil erstellt, startet und analysiert mit dem dotnet des Systems. "
+"Installieren Sie das .NET 10 SDK aus Ihrer Distribution (zum Beispiel `sudo "
+"dnf install dotnet-sdk-10.0`)."
+
+#: anvil/src/ui/window.rs:641
+#, rust-format
+msgid ""
+"Visual Studio will start {} (the first project). Move {} first in the "
+"solution?"
+msgstr ""
+"Visual Studio startet {} (das erste Projekt). {} in der Projektmappe nach "
+"vorne verschieben?"
+
+#: anvil/src/ui/window.rs:642
+msgid "Move First"
+msgstr "Nach vorne"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:1
+msgid "New Project…"
+msgstr "Neues Projekt…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:2
+msgid "Open Project or Solution…"
+msgstr "Projekt/Projektmappe öffnen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:3
+msgid "Open Folder…"
+msgstr "Ordner öffnen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:4
+msgid "Open File…"
+msgstr "Datei öffnen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:6
+msgid "Save All"
+msgstr "Alle speichern"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:7
+msgid "Close Solution"
+msgstr "Projektmappe schließen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:8
+msgid "Hand in as ZIP…"
+msgstr "Als ZIP abgeben…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:9
+msgid "Exit"
+msgstr "Beenden"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:10
+msgid "Undo"
+msgstr "Rückgängig"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:11
+msgid "Redo"
+msgstr "Wiederholen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:16
+msgid "Find Next"
+msgstr "Weitersuchen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:17
+msgid "Find Previous"
+msgstr "Vorheriges suchen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:20
+msgid "Comment Selection"
+msgstr "Auswahl kommentieren"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:21
+msgid "Uncomment Selection"
+msgstr "Auskommentierung der Auswahl aufheben"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:22
+msgid "Toggle Line Comment"
+msgstr "Zeilenkommentar umschalten"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:23
+msgid "Format Document"
+msgstr "Dokument formatieren"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:24
+msgid "Format Selection"
+msgstr "Auswahl formatieren"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:25
+msgid "Move Selected Lines Up"
+msgstr "Ausgewählte Zeilen nach oben verschieben"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:26
+msgid "Move Selected Lines Down"
+msgstr "Ausgewählte Zeilen nach unten verschieben"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:27
+msgid "Duplicate"
+msgstr "Duplizieren"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:28
+msgid "Delete Line"
+msgstr "Zeile löschen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:29
+msgid "Cut Line"
+msgstr "Zeile ausschneiden"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:30
+msgid "Word Wrap"
+msgstr "Zeilenumbruch"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:31
+msgid "View White Space"
+msgstr "Leerraum anzeigen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:32
+msgid "Make Uppercase"
+msgstr "Großbuchstaben"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:33
+msgid "Make Lowercase"
+msgstr "Kleinbuchstaben"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:34
+msgid "Go To Brace"
+msgstr "Gehe zu Klammer"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:35
+msgid "Complete Word"
+msgstr "Wort vervollständigen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:36
+msgid "Parameter Info"
+msgstr "Parameterinfo"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:37
+msgid "Quick Info"
+msgstr "QuickInfo"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:38
+msgid "Quick Actions and Refactorings…"
+msgstr "Schnellaktionen und Refactorings…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:39
+msgid "Rename…"
+msgstr "Umbenennen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:40
+msgid "Go To Definition"
+msgstr "Gehe zu Definition"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:41
+msgid "Peek Definition"
+msgstr "Definition einsehen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:44
+msgid "Insert Snippet"
+msgstr "Ausschnitt einfügen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:45
+msgid "Surround With"
+msgstr "Umschließen mit"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:46
+msgid "Navigate Backward"
+msgstr "Rückwärts navigieren"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:47
+msgid "Navigate Forward"
+msgstr "Vorwärts navigieren"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:48
+msgid "Next Error"
+msgstr "Nächster Fehler"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:49
+msgid "Document Outline"
+msgstr "Dokumentgliederung"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:58
+msgid "Full Screen"
+msgstr "Vollbild"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:61
+msgid "Manage NuGet Packages…"
+msgstr "NuGet-Pakete verwalten…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:63
+msgid "Next Document"
+msgstr "Nächstes Dokument"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:64
+msgid "Previous Document"
+msgstr "Vorheriges Dokument"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:65
+msgid "Pin Tab"
+msgstr "Registerkarte anheften"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:66
+msgid "Split"
+msgstr "Teilen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:67
+msgid "Build Solution"
+msgstr "Projektmappe erstellen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:68
+msgid "Rebuild Solution"
+msgstr "Projektmappe neu erstellen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:69
+msgid "Clean Solution"
+msgstr "Projektmappe bereinigen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:70
+msgid "Build Project"
+msgstr "Projekt erstellen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:71
+msgid "Cancel Build"
+msgstr "Build abbrechen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:72
+msgid "Start Debugging"
+msgstr "Debuggen starten"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:73
+msgid "Start Without Debugging"
+msgstr "Starten ohne Debuggen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:74
+msgid "Stop Debugging"
+msgstr "Debuggen beenden"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:75
+msgid "Restart"
+msgstr "Neu starten"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:76
+msgid "Break All"
+msgstr "Alle unterbrechen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:77
+msgid "Step Over"
+msgstr "Prozedurschritt"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:78
+msgid "Step Into"
+msgstr "Einzelschritt"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:79
+msgid "Step Out"
+msgstr "Ausführen bis Rücksprung"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:80
+msgid "Run To Cursor"
+msgstr "Ausführen bis Cursor"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:81
+msgid "Toggle Breakpoint"
+msgstr "Haltepunkt umschalten"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:82
+msgid "Delete All Breakpoints"
+msgstr "Alle Haltepunkte löschen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:83
+msgid "QuickWatch…"
+msgstr "Schnellüberwachung…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:86
+msgid "Watch"
+msgstr "Überwachen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:88
+msgid "Immediate"
+msgstr "Direkt"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:91
+msgid "Hot Reload"
+msgstr "Hot Reload"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:92
+msgid "Run All Tests"
+msgstr "Alle Tests ausführen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:93
+msgid "Debug All Tests"
+msgstr "Alle Tests debuggen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:94
+msgid "Run Tests"
+msgstr "Tests ausführen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:95
+msgid "Debug Tests"
+msgstr "Tests debuggen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:97
+msgid "Run Failed Tests"
+msgstr "Fehlerhafte Tests ausführen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:98
+msgid "Add New Item…"
+msgstr "Neues Element hinzufügen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:99
+msgid "Add Existing Item…"
+msgstr "Vorhandenes Element hinzufügen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:100
+msgid "Add Class…"
+msgstr "Klasse hinzufügen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:103
+msgid "View Class Diagram"
+msgstr "Klassendiagramm anzeigen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:104
+msgid "Add Project Reference…"
+msgstr "Projektverweis hinzufügen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:105
+msgid "Set as Startup Project"
+msgstr "Als Startprojekt festlegen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:107
+msgid "Add New Project…"
+msgstr "Neues Projekt hinzufügen…"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:111
+msgid "Open Folder in File Manager"
+msgstr "Ordner im Dateimanager öffnen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:112
+msgid "Open in Terminal"
+msgstr "Im Terminal öffnen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:116
+msgid "Zoom In"
+msgstr "Vergrößern"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:117
+msgid "Zoom Out"
+msgstr "Verkleinern"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:125
+msgid "AI Off"
+msgstr "KI aus"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:126
+msgid "Restart Language Server"
+msgstr "Sprachserver neu starten"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:127
+msgid "Keyboard Shortcuts"
+msgstr "Tastenkombinationen"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:129
+msgid "Property with private set"
+msgstr "Eigenschaft mit privatem set"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:130
+msgid "Property with backing field"
+msgstr "Eigenschaft mit Unterstützungsfeld"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:133
+msgid "for loop"
+msgstr "for-Schleife"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:134
+msgid "Reverse for loop"
+msgstr "Umgekehrte for-Schleife"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:135
+msgid "foreach loop"
+msgstr "foreach-Schleife"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:136
+msgid "while loop"
+msgstr "while-Schleife"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:137
+msgid "do...while loop"
+msgstr "do...while-Schleife"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:138
+msgid "if statement"
+msgstr "if-Anweisung"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:139
+msgid "else statement"
+msgstr "else-Anweisung"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:140
+msgid "switch statement"
+msgstr "switch-Anweisung"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:141
+msgid "try catch"
+msgstr "try catch"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:142
+msgid "try finally"
+msgstr "try finally"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:143
+msgid "using statement"
+msgstr "using-Anweisung"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:144
+msgid "lock statement"
+msgstr "lock-Anweisung"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:145
+msgid "checked block"
+msgstr "checked-Block"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:146
+msgid "unchecked block"
+msgstr "unchecked-Block"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:147
+msgid "Console.WriteLine"
+msgstr "Console.WriteLine"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:148
+msgid "static void Main"
+msgstr "static void Main"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:149
+msgid "static int Main"
+msgstr "static int Main"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:150
+msgid "class"
+msgstr "class"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:151
+msgid "interface"
+msgstr "interface"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:152
+msgid "enum"
+msgstr "enum"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:153
+msgid "struct"
+msgstr "struct"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:154
+msgid "namespace"
+msgstr "namespace"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:155
+msgid "Indexer"
+msgstr "Indexer"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:156
+msgid "Exception"
+msgstr "Ausnahme"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:157
+msgid "MSTest test method"
+msgstr "MSTest-Testmethode"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:158
+msgid "MSTest test class"
+msgstr "MSTest-Testklasse"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:165
+msgid "MSTest Test Class"
+msgstr "MSTest-Testklasse"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:166
+msgid "NUnit Test Class"
+msgstr "NUnit-Testklasse"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:167
+msgid "JSON File"
+msgstr "JSON-Datei"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:168
+msgid "Text File"
+msgstr "Textdatei"
+
+#: /tmp/tmp.qBiGGWFrBj.rs:169
+msgid "editorconfig File (.NET)"
+msgstr "editorconfig-Datei (.NET)"
+
+#~ msgid "line"
+#~ msgstr "Zeile"
+
+#~ msgid "Reference counts above members (CodeLens)"
+#~ msgstr "Verweisanzahl über Membern (CodeLens)"
+
+#~ msgid "Git blame in the gutter"
+#~ msgstr "Git Blame am Rand"
