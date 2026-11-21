@@ -94,6 +94,15 @@ pub fn run(dir: PathBuf) {
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
+    // ANVIL_SHOTS=build: the job in the status line, the result toast,
+    // the Output window and Ctrl+F5 on any solution.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("build")
+        && let Ok(open) = std::env::var("ANVIL_OPEN")
+    {
+        steps.extend(build_steps(PathBuf::from(open)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
     if let Ok(open) = std::env::var("ANVIL_OPEN") {
         let sol = PathBuf::from(&open);
         let project_dir = sol.parent().map(|d| d.join(sol.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())).unwrap_or_default();
@@ -282,6 +291,48 @@ fn ui_steps(sol: PathBuf) -> Vec<Step> {
 /// Breakpoint with hit count 3 in the loop, F5, Locals, a step (changed
 /// values), Watch, Call Stack, Breakpoints, then input in the terminal and
 /// the end of the program; light and dark.
+fn build_steps(sol: PathBuf) -> Vec<Step> {
+    let building = || crate::ui::window::app().builder.is_running();
+    let running = || crate::ui::window::app().terminal.is_running();
+    vec![
+        act(move || window::open_path(&sol)),
+        Step::Wait(1500),
+        command("build.solution"),
+        Step::Wait(2500),
+        Step::Shot("build-running"),
+        until(move || !building(), 180_000),
+        Step::Wait(400),
+        Step::Shot("build-result"),
+        act(|| {
+            let app = crate::ui::window::app();
+            app.output.show("Build");
+            window::show_bottom("output");
+        }),
+        Step::Wait(600),
+        Step::Shot("build-output"),
+        command("debug.start-without"),
+        until(running, 180_000),
+        Step::Wait(2500),
+        Step::Shot("run-terminal"),
+        act(|| crate::ui::window::app().terminal.send_input("x")),
+        Step::Wait(1500),
+        act(|| {
+            let app = crate::ui::window::app();
+            app.output.show("Run");
+            window::show_bottom("output");
+        }),
+        Step::Wait(600),
+        Step::Shot("run-output"),
+        Step::Theme(adw::ColorScheme::ForceDark),
+        command("build.solution"),
+        Step::Wait(2500),
+        Step::Shot("build-running-dark"),
+        until(move || !building(), 180_000),
+        Step::Wait(400),
+        Step::Shot("build-result-dark"),
+    ]
+}
+
 fn debug_steps(sol: PathBuf) -> Vec<Step> {
     let p2 = sol.parent().map(|d| d.join("DebugDemo/Program.cs")).unwrap_or_default();
     let stopped = || crate::ui::window::app().debugger.is_stopped();

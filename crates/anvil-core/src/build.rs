@@ -114,6 +114,20 @@ pub fn assets_current(project: &Path) -> bool {
     true
 }
 
+/// After a build that restored and succeeded: marks each project's
+/// assets as current. NuGet leaves its files untouched when a restore
+/// changes nothing (an edited property in the project file), so without
+/// this every later build would restore again.
+pub fn mark_restored(projects: &[PathBuf]) {
+    let now = SystemTime::now();
+    for p in projects {
+        let cache = p.parent().map(|d| d.join("obj/project.nuget.cache"));
+        if let Some(f) = cache.filter(|c| c.is_file()).and_then(|c| std::fs::File::options().write(true).open(c).ok()) {
+            let _ = f.set_modified(now);
+        }
+    }
+}
+
 /// The project MSBuild just finished at minimal verbosity and what it
 /// wrote (`  Core -> /work/Core/bin/Debug/net10.0/Core.dll`). Ctrl+F5 and
 /// F5 run that file, which spares a second MSBuild evaluation for
@@ -200,6 +214,9 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
         std::fs::write(&p, csproj(&["x.csproj"])).unwrap();
         assert!(!assets_current(&p), "project file edited");
+        std::thread::sleep(Duration::from_millis(20));
+        mark_restored(std::slice::from_ref(&p));
+        assert!(assets_current(&p), "a no-op restore counts once the build marked it");
         let _ = std::fs::remove_dir_all(&d);
     }
 

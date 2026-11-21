@@ -76,6 +76,10 @@ pub fn start(key: &str, text: &str) -> Job {
         s.next_id += 1;
         let id = s.next_id;
         s.jobs.retain(|j| j.key != key);
+        // The last run's result is old news once the next run starts.
+        if let Some(t) = s.toasts.remove(key) {
+            t.dismiss();
+        }
         s.jobs.push(Entry { id, key: key.to_owned(), text: text.to_owned(), started: Instant::now(), cancel: None });
         id
     });

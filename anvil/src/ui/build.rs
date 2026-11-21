@@ -103,7 +103,7 @@ pub fn build_then(target: Target, verb: Verb, done: impl FnOnce(bool) + 'static)
     let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     app.output.append("Build", &format!("{} {}\n", trf("Build started: {}", &[&file]), glib::DateTime::now_local().map(|d| d.format("%H:%M:%S").map(|s| s.to_string()).unwrap_or_default()).unwrap_or_default()));
     app.status.set_message("");
-    run(Run { verb, path, restore, retried: false, total: projects.len(), text, job }, Box::new(done));
+    run(Run { verb, path, restore, retried: false, projects, text, job }, Box::new(done));
 }
 
 struct Run {
@@ -112,7 +112,7 @@ struct Run {
     restore: bool,
     /// Already run again with restore after `--no-restore` met stale assets.
     retried: bool,
-    total: usize,
+    projects: Vec<PathBuf>,
     text: String,
     job: jobs::Job,
 }
@@ -156,9 +156,9 @@ fn run(r: Run, done: Box<dyn FnOnce(bool)>) {
                         app.builder.outputs.borrow_mut().insert(project.to_owned(), PathBuf::from(out));
                         finished += 1;
                     }
-                    if finished > 0 && r.total > 1 && shown_progress != finished {
+                    if finished > 0 && r.projects.len() > 1 && shown_progress != finished {
                         shown_progress = finished;
-                        r.job.set_text(&format!("{} {}", r.text, trf("{} of {}", &[&finished.min(r.total).to_string(), &r.total.to_string()])));
+                        r.job.set_text(&format!("{} {}", r.text, trf("{} of {}", &[&finished.min(r.projects.len()).to_string(), &r.projects.len().to_string()])));
                     }
                     if diags.len() != shown && last_shown.elapsed() > std::time::Duration::from_millis(300) {
                         shown = diags.len();
@@ -186,12 +186,20 @@ fn run(r: Run, done: Box<dyn FnOnce(bool)>) {
             run(Run { restore: true, retried: true, ..r }, done);
             return;
         }
+        if ok && r.restore {
+            anvil_core::build::mark_restored(&r.projects);
+        }
         app.errors.set_build(&diags, window::solution_dir().as_deref());
         let c = diagnostics::counts(&diags);
         let elapsed = anvil_core::build::format_elapsed(r.job.elapsed());
         r.job.finish();
         jobs::trace(&format!("build finished after {} ms", started.elapsed().as_millis()));
-        let counts = trf("{} errors, {} warnings", &[&c.errors.to_string(), &c.warnings.to_string()]);
+        // The Error List's own counters, so both read the same.
+        let counts = format!(
+            "{}, {}",
+            crate::i18n::ntr("{} Error", "{} Errors", c.errors as u32).replace("{}", &c.errors.to_string()),
+            crate::i18n::ntr("{} Warning", "{} Warnings", c.warnings as u32).replace("{}", &c.warnings.to_string())
+        );
         let summary = if status.is_none() {
             tr("Build canceled")
         } else if r.verb == Verb::Clean {
