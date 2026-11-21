@@ -394,6 +394,28 @@ msgstr "Das erstellte Programm wurde unter {} nicht gefunden."
 msgid "Starting the program…"
 msgstr "Programm wird gestartet…"
 
+#: anvil/src/ui/debugger.rs
+#, rust-format
+msgid "Starting {}…"
+msgstr "{} wird gestartet…"
+
+#: anvil/src/ui/debugger.rs
+msgid "Attaching the debugger…"
+msgstr "Debugger wird angehängt…"
+
+#: anvil/src/ui/debugger.rs
+msgid "Debugging canceled"
+msgstr "Debuggen abgebrochen"
+
+#: anvil/src/ui/debugger.rs
+msgid "Details"
+msgstr "Details"
+
+#: anvil/src/ui/build.rs
+#, rust-format
+msgid "{} is a class library ({}) and cannot be started directly. Choose a console app as startup project (the list next to Start, or Set as Startup Project in the Solution Explorer)."
+msgstr "{} ist eine Klassenbibliothek ({}) und kann nicht direkt gestartet werden. Wählen Sie eine Konsolen-App als Startprojekt (Liste neben Starten oder „Als Startprojekt festlegen“ im Projektmappen-Explorer)."
+
 #: anvil/src/ui/debugger.rs:943
 msgid "The program ended before the debugger could attach. The terminal panel shows its output."
 msgstr "Das Programm wurde beendet, bevor sich der Debugger anhängen konnte. Das Terminal zeigt seine Ausgabe."

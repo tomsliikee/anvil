@@ -787,30 +787,35 @@ impl Debugger {
         self.cancel_start.get()
     }
 
-    /// Greys out what cannot run now, as VS does: Continue and the steps
-    /// only while stopped (F10/F11 also start a session), Break All only
-    /// while running, Stop while a session runs or starts.
+    /// Greys out what cannot run now (see [`command_states`]).
     pub fn update_controls(&self) {
         let app = crate::ui::window::app();
-        let (active, stopped, starting) = (self.is_active(), self.is_stopped(), self.is_starting());
-        let states = [
-            ("debug.start", !starting && (!active || stopped)),
-            ("debug.start-without", !active && !starting),
-            ("debug.break-all", active && !stopped),
-            ("debug.stop", active || starting),
-            ("debug.restart", active),
-            ("debug.step-over", !starting && (!active || stopped)),
-            ("debug.step-into", !starting && (!active || stopped)),
-            ("debug.step-out", stopped),
-            ("debug.run-to-cursor", !starting && (!active || stopped)),
-            ("debug.quick-watch", stopped),
-        ];
-        for (name, on) in states {
+        for (name, on) in command_states(self.is_active(), self.is_stopped(), self.is_starting()) {
             if let Some(a) = app.window.lookup_action(name).and_downcast::<gio::SimpleAction>() {
                 a.set_enabled(on);
             }
         }
     }
+}
+
+/// Which debug commands can act, as in VS: Continue and the steps only
+/// while stopped (F5, F10 and F11 also start a session), Break All only
+/// while running, Stop while a session runs or starts (it cancels the
+/// start), Restart while a session runs.
+fn command_states(active: bool, stopped: bool, starting: bool) -> [(&'static str, bool); 10] {
+    let can_go = !starting && (!active || stopped);
+    [
+        ("debug.start", can_go),
+        ("debug.start-without", !active && !starting),
+        ("debug.break-all", active && !stopped),
+        ("debug.stop", active || starting),
+        ("debug.restart", active),
+        ("debug.step-over", can_go),
+        ("debug.step-into", can_go),
+        ("debug.step-out", stopped),
+        ("debug.run-to-cursor", can_go),
+        ("debug.quick-watch", stopped),
+    ]
 }
 
 /// Calls `apply` with the entry's text on Enter and when focus leaves it.
@@ -1370,7 +1375,19 @@ fn fail(title: &str, detail: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::hover_expression;
+    use super::{command_states, hover_expression};
+
+    fn enabled(active: bool, stopped: bool, starting: bool) -> Vec<&'static str> {
+        command_states(active, stopped, starting).into_iter().filter(|(_, on)| *on).map(|(n, _)| n).collect()
+    }
+
+    #[test]
+    fn debug_commands_follow_the_session() {
+        assert_eq!(enabled(false, false, false), ["debug.start", "debug.start-without", "debug.step-over", "debug.step-into", "debug.run-to-cursor"]);
+        assert_eq!(enabled(false, false, true), ["debug.stop"]);
+        assert_eq!(enabled(true, false, false), ["debug.break-all", "debug.stop", "debug.restart"]);
+        assert_eq!(enabled(true, true, false), ["debug.start", "debug.stop", "debug.restart", "debug.step-over", "debug.step-into", "debug.step-out", "debug.run-to-cursor", "debug.quick-watch"]);
+    }
 
     #[test]
     fn hover_expressions() {
