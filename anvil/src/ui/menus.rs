@@ -170,7 +170,7 @@ fn top_menus() -> Vec<(String, Vec<Item>)> {
                 C("edit.move-line-down"),
                 C("edit.delete-line"),
                 S,
-                Item::Submenu(tr("IntelliSense"), vec![C("edit.complete-word"), C("edit.parameter-info"), C("edit.quick-info"), C("edit.insert-snippet"), C("edit.surround-with")]),
+                Item::Submenu(tr("IntelliSense"), vec![C("edit.complete-word"), C("edit.parameter-info"), C("edit.quick-info"), C("edit.ai-suggest"), C("edit.insert-snippet"), C("edit.surround-with")]),
                 Item::Submenu(tr("Refactor"), vec![C("edit.rename"), C("edit.quick-actions")]),
             ],
         ),

@@ -69,6 +69,8 @@ pub const COMMANDS: &[CommandDef] = &[
     cmd!("edit.goto-brace", "Edit.GotoBrace", "Go To Brace", ["Ctrl+]"]),
     cmd!("edit.complete-word", "Edit.CompleteWord", "Complete Word", ["Ctrl+Space", "Alt+Right"]),
     cmd!("edit.parameter-info", "Edit.ParameterInfo", "Parameter Info", ["Ctrl+Shift+Space"]),
+    // VS Code's key; VS has no default for it.
+    cmd!("edit.ai-suggest", "Edit.TriggerInlineSuggestion", "Suggest Inline Completion (AI)", ["Alt+\\"]),
     cmd!("edit.quick-info", "Edit.QuickInfo", "Quick Info", ["Ctrl+K, Ctrl+I"]),
     cmd!("edit.quick-actions", "View.QuickActions", "Quick Actions and Refactorings…", ["Ctrl+.", "Alt+Enter"]),
     cmd!("edit.rename", "Refactor.Rename", "Rename…", ["Ctrl+R, Ctrl+R", "F2"]),

@@ -1326,61 +1326,159 @@ pub fn attach_context_menu(doc: &Rc<CodeDoc>) {
 
 thread_local! {
     static AI_TIMER: RefCell<Option<glib::SourceId>> = const { RefCell::new(None) };
+    /// The request in flight. Typing aborts it, which closes the
+    /// connection so Ollama stops generating instead of queueing stale
+    /// requests ahead of the next one.
+    static AI_TASK: RefCell<Option<tokio::task::AbortHandle>> = const { RefCell::new(None) };
+    /// The last AI problem shown in the status bar: said once, not on
+    /// every typing pause.
+    static AI_HINT: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
-/// Requests ghost text 250 ms after typing stops; any keystroke cancels it
-/// (the serial changes and the answer is dropped).
-pub fn schedule_ai(doc: &Rc<CodeDoc>) {
-    doc.view.set_ghost(None);
-    let app = crate::ui::window::app();
-    if !(app.settings.boolean("ai-enabled") && app.settings.boolean("ai-inline")) || !doc.is_csharp() || doc.quiet.get() {
-        return;
-    }
+/// Longest wait for one suggestion; loading a 7b model cold takes about
+/// 45 s on a laptop CPU.
+const AI_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+/// A suggestion slower than this gets a hint to pick a smaller model.
+const AI_SLOW: std::time::Duration = std::time::Duration::from_secs(5);
+
+fn inline_ai_on() -> bool {
+    let s = &crate::ui::window::app().settings;
+    s.boolean("ai-enabled") && s.boolean("ai-inline")
+}
+
+fn cancel_ai() {
     AI_TIMER.with(|t| {
         if let Some(id) = t.borrow_mut().take() {
             id.remove();
         }
     });
+    AI_TASK.with(|t| {
+        if let Some(h) = t.borrow_mut().take() {
+            h.abort();
+        }
+    });
+}
+
+/// Forgets the last hint, so a changed setting gets a fresh answer.
+pub fn reset_ai_hint() {
+    AI_HINT.with(|h| h.borrow_mut().take());
+}
+
+/// Shows `text` in the status bar unless it is the hint shown last.
+fn hint_once(text: String) {
+    let new = AI_HINT.with(|h| {
+        let mut h = h.borrow_mut();
+        let new = h.as_deref() != Some(&text);
+        *h = Some(text.clone());
+        new
+    });
+    if new {
+        crate::ui::window::app().status.flash(&text);
+    }
+}
+
+/// What the user can do about an AI error.
+pub fn ai_error_hint(e: &anvil_ai::ollama::Error, url: &str) -> String {
+    use anvil_ai::ollama::Error;
+    match e {
+        Error::Unreachable(_) => trf("AI: Ollama does not answer at {}. Start it (ollama serve) or check the address in Settings → AI.", &[url]),
+        Error::ModelMissing(m) => trf("AI: the model {} is not installed. Run “ollama pull {}” or pick an installed model in Settings → AI.", &[m, m]),
+        Error::NoModel => tr("AI: Ollama has no coder model. Run “ollama pull qwen2.5-coder:1.5b”."),
+        Error::Timeout => tr("AI: no suggestion within 60 s. Pick a smaller model in Settings → AI."),
+        Error::Server(m) => trf("AI: Ollama reports: {}", &[m]),
+    }
+}
+
+/// Every edit drops the ghost text and the request in flight; with
+/// "suggest while typing" on, a new one is asked for after the typing
+/// pause set in Settings → AI (600 ms by default).
+pub fn schedule_ai(doc: &Rc<CodeDoc>) {
+    doc.view.set_ghost(None);
+    cancel_ai();
+    let app = crate::ui::window::app();
+    if !inline_ai_on() || !app.settings.boolean("ai-inline-auto") || !doc.is_csharp() || doc.quiet.get() {
+        return;
+    }
+    let delay = app.settings.int("ai-inline-delay").clamp(100, 5000) as u64;
     let weak = Rc::downgrade(doc);
-    let id = glib::timeout_add_local_once(std::time::Duration::from_millis(250), move || {
+    let id = glib::timeout_add_local_once(std::time::Duration::from_millis(delay), move || {
         AI_TIMER.with(|t| t.borrow_mut().take());
         if let Some(doc) = weak.upgrade() {
-            glib::spawn_future_local(ai_complete(doc));
+            glib::spawn_future_local(ai_complete(doc, false));
         }
     });
     AI_TIMER.with(|t| *t.borrow_mut() = Some(id));
 }
 
-async fn ai_complete(doc: Rc<CodeDoc>) {
+/// `Alt+\`: a suggestion at the caret now, wherever it is.
+pub fn request_ai() {
+    let app = crate::ui::window::app();
+    let Some(doc) = app.tabs.current_code() else { return };
+    if !inline_ai_on() {
+        app.status.flash(&tr("AI: inline completion is off. Turn it on in Settings → AI."));
+        return;
+    }
+    doc.view.set_ghost(None);
+    cancel_ai();
+    // An explicit request always reports, even a problem said before.
+    reset_ai_hint();
+    glib::spawn_future_local(ai_complete(doc, true));
+}
+
+async fn ai_complete(doc: Rc<CodeDoc>, explicit: bool) {
     let app = crate::ui::window::app();
     let serial = doc.change_serial.get();
     let offset = doc.cursor_offset();
     let text = doc.text();
     let cursor = doc.cursor_byte();
-    // Only at the end of a line, as VS suggests.
-    if !text[cursor..].split('\n').next().unwrap_or("").trim().is_empty() {
+    if !explicit && !anvil_ai::context::may_suggest_before(text[cursor..].split('\n').next().unwrap_or("")) {
         return;
     }
-    let model = app.settings.string("ai-inline-model").to_string();
+    let configured = app.settings.string("ai-inline-model").to_string();
     let url = app.settings.string("ollama-url").to_string();
-    let sigs = crate::ui::chat::project_signatures(2000);
-    let (prefix, suffix) = anvil_ai::context::fim(&text, cursor, &sigs, 6000);
-    let Some(ollama) = anvil_ai::ollama::Ollama::new(&url) else { return };
-    let result = crate::runtime::run(async move {
-        let model = if model.is_empty() { ollama.models().await.ok().and_then(|m| m.into_iter().find(|m| m.is_coder()).map(|m| m.name)).unwrap_or_default() } else { model };
-        if model.is_empty() {
-            return Err(anvil_ai::ollama::Error::Server("no model".into()));
+    let Some(ollama) = anvil_ai::ollama::Ollama::new(&url) else {
+        hint_once(trf("AI: the Ollama address must be on this computer (like {}), not {}.", &[anvil_ai::ollama::DEFAULT_URL, &url]));
+        return;
+    };
+    // Small context: on a CPU the prompt costs more than the answer.
+    let sigs = crate::ui::chat::project_signatures(800);
+    let (prefix, suffix) = anvil_ai::context::fim(&text, cursor, &sigs, 3000);
+    let handle = crate::runtime::handle().spawn(async move {
+        let models = ollama.models().await?;
+        let model = anvil_ai::ollama::pick_inline_model(&models, &configured)?;
+        let started = std::time::Instant::now();
+        let raw = ollama.complete(&model, &prefix, &suffix, 48, AI_TIMEOUT).await?;
+        Ok::<_, anvil_ai::ollama::Error>((model, anvil_ai::ollama::clean_completion(&raw, &suffix), started.elapsed()))
+    });
+    let abort = handle.abort_handle();
+    let id = abort.id();
+    AI_TASK.with(|t| *t.borrow_mut() = Some(abort));
+    let result = handle.await;
+    AI_TASK.with(|t| {
+        let mut t = t.borrow_mut();
+        if t.as_ref().is_some_and(|h| h.id() == id) {
+            t.take();
         }
-        ollama.complete(&model, &prefix, &suffix, 64).await.map(|s| anvil_ai::ollama::clean_completion(&s, &suffix))
-    })
-    .await;
+    });
+    // Aborted by typing: nothing to say.
+    let Ok(result) = result else { return };
     if doc.change_serial.get() != serial || doc.cursor_offset() != offset {
         return;
     }
     match result {
-        Ok(s) if !s.trim().is_empty() => doc.view.set_ghost(Some((offset, s))),
-        Ok(_) => {}
-        Err(e) => app.status.flash(&e.to_string()),
+        Ok((model, s, took)) => {
+            if took > AI_SLOW {
+                hint_once(trf("AI: {} took {} s for a suggestion. A smaller model (Settings → AI) answers faster.", &[&model, &took.as_secs().to_string()]));
+            } else {
+                reset_ai_hint();
+            }
+            if !s.trim().is_empty() {
+                doc.view.set_ghost(Some((offset, s)));
+            } else if explicit {
+                app.status.flash(&tr("AI: no suggestion here."));
+            }
+        }
+        Err(e) => hint_once(ai_error_hint(&e, &url)),
     }
 }
 

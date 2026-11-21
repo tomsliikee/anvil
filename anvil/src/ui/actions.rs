@@ -103,6 +103,7 @@ pub fn dispatch(id: &str) {
         "edit.goto-brace" => with_code(|d| d.goto_brace()),
         "edit.complete-word" => with_code(|d| d.view.emit_show_completion()),
         "edit.parameter-info" => lsp::signature_help(),
+        "edit.ai-suggest" => lsp::request_ai(),
         "edit.quick-info" => lsp::quick_info(),
         "edit.quick-actions" => lsp::quick_actions(),
         "edit.rename" => {

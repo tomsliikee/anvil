@@ -2441,3 +2441,75 @@ msgstr "editorconfig-Datei (.NET)"
 
 #~ msgid "Git blame in the gutter"
 #~ msgstr "Git Blame am Rand"
+
+msgid "Suggest Inline Completion (AI)"
+msgstr "Inline-Vorschlag anfordern (KI)"
+
+msgid "Inline completion"
+msgstr "Inline-Vervollständigung"
+
+msgid "Tab accepts, Ctrl+Right accepts one word, Escape dismisses. Alt+\\ asks for a suggestion at any time."
+msgstr "Tab übernimmt, Strg+Rechts übernimmt ein Wort, Escape verwirft. Alt+\\ fordert jederzeit einen Vorschlag an."
+
+msgid "Suggest while typing"
+msgstr "Beim Tippen vorschlagen"
+
+msgid "Typing pause before a suggestion (ms)"
+msgstr "Tipppause vor einem Vorschlag (ms)"
+
+msgid "Model"
+msgstr "Modell"
+
+msgid "Small models answer fastest; without a GPU, 1.5b–3b are the usable size."
+msgstr "Kleine Modelle antworten am schnellsten; ohne GPU sind 1.5b–3b die brauchbare Größe."
+
+msgid "Ollama"
+msgstr "Ollama"
+
+msgid "Address"
+msgstr "Adresse"
+
+msgid "Connection"
+msgstr "Verbindung"
+
+msgid "Check again"
+msgstr "Erneut prüfen"
+
+msgid "Automatic ({})"
+msgstr "Automatisch ({})"
+
+msgid "Automatic (smallest coder model)"
+msgstr "Automatisch (kleinstes Coder-Modell)"
+
+msgid "{} (not installed)"
+msgstr "{} (nicht installiert)"
+
+msgid "Connected: {} models installed"
+msgstr "Verbunden: {} Modelle installiert"
+
+msgid "AI: Ollama does not answer at {}. Start it (ollama serve) or check the address in Settings → AI."
+msgstr "KI: Ollama antwortet nicht unter {}. Starten Sie es (ollama serve) oder prüfen Sie die Adresse unter Einstellungen → KI."
+
+msgid "AI: the model {} is not installed. Run “ollama pull {}” or pick an installed model in Settings → AI."
+msgstr "KI: Das Modell {} ist nicht installiert. Führen Sie „ollama pull {}“ aus oder wählen Sie ein installiertes Modell unter Einstellungen → KI."
+
+msgid "AI: Ollama has no coder model. Run “ollama pull qwen2.5-coder:1.5b”."
+msgstr "KI: Ollama hat kein Coder-Modell. Führen Sie „ollama pull qwen2.5-coder:1.5b“ aus."
+
+msgid "AI: no suggestion within 60 s. Pick a smaller model in Settings → AI."
+msgstr "KI: Kein Vorschlag innerhalb von 60 s. Wählen Sie ein kleineres Modell unter Einstellungen → KI."
+
+msgid "AI: Ollama reports: {}"
+msgstr "KI: Ollama meldet: {}"
+
+msgid "AI: inline completion is off. Turn it on in Settings → AI."
+msgstr "KI: Die Inline-Vervollständigung ist aus. Schalten Sie sie unter Einstellungen → KI ein."
+
+msgid "AI: no suggestion here."
+msgstr "KI: Hier gibt es keinen Vorschlag."
+
+msgid "AI: the Ollama address must be on this computer (like {}), not {}."
+msgstr "KI: Die Ollama-Adresse muss auf diesem Computer liegen (wie {}), nicht {}."
+
+msgid "AI: {} took {} s for a suggestion. A smaller model (Settings → AI) answers faster."
+msgstr "KI: {} brauchte {} s für einen Vorschlag. Ein kleineres Modell (Einstellungen → KI) antwortet schneller."

@@ -94,6 +94,16 @@ pub fn run(dir: PathBuf) {
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
+    // ANVIL_SHOTS=ai with ANVIL_OPEN=<file.cs>: ghost text against the
+    // real local Ollama as a user gets it (typed key by key, then a pause),
+    // Tab, and the hints for a missing model and an unreachable Ollama.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("ai")
+        && let Ok(open) = std::env::var("ANVIL_OPEN")
+    {
+        steps.extend(ai_steps(PathBuf::from(open)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
     if let Ok(open) = std::env::var("ANVIL_OPEN") {
         let sol = PathBuf::from(&open);
         let project_dir = sol.parent().map(|d| d.join(sol.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())).unwrap_or_default();
@@ -217,6 +227,87 @@ pub fn run(dir: PathBuf) {
 
 /// Four files opened as preview tabs one after another (the order that
 /// crashed), the diagram, and the dialogs, light and dark.
+fn ai_steps(file: PathBuf) -> Vec<Step> {
+    let ghost = || crate::ui::window::app().tabs.current_code().and_then(|d| d.view.ghost());
+    let settings = || crate::ui::window::app().settings.clone();
+    let started = Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let mut steps = vec![
+        act(move || {
+            let s = settings();
+            for key in ["ai-enabled", "ai-inline", "ai-inline-auto"] {
+                let _ = s.set_boolean(key, true);
+            }
+            crate::ui::window::app().tabs.open(&file, false);
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                let text = d.text();
+                if let Some(i) = text.find("var p = new Person();\n") {
+                    let at = i + "var p = new Person();\n".len();
+                    let mut it = d.iter_at_byte(at);
+                    d.buffer.insert(&mut it, "            \n");
+                    d.buffer.place_cursor(&d.iter_at_byte(at + 12));
+                }
+            }
+        }),
+        Step::Wait(800),
+    ];
+    // Typed as a person types: every key aborts the request in flight.
+    for c in "Console.Wri".chars() {
+        steps.push(act(move || {
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                d.buffer.begin_user_action();
+                d.buffer.insert_at_cursor(&c.to_string());
+                d.buffer.end_user_action();
+            }
+        }));
+        steps.push(Step::Wait(120));
+    }
+    let s0 = started.clone();
+    steps.push(act(move || s0.set(std::time::Instant::now())));
+    steps.push(until(move || ghost().is_some(), 90000));
+    let s1 = started.clone();
+    steps.push(act(move || println!("anvil: ai: ghost after the pause in {} ms: {:?}", s1.get().elapsed().as_millis(), ghost().map(|g| g.1))));
+    steps.push(Step::Shot("ai-ghost-light"));
+    steps.push(act(|| {
+        let tab = anvil_core::keymap::Combo { ctrl: false, shift: false, alt: false, key: "Tab".into() };
+        let accepted = crate::ui::editor::handle_editor_key(&tab);
+        let line = crate::ui::window::app().tabs.current_code().map(|d| {
+            let it = d.buffer.iter_at_mark(&d.buffer.get_insert());
+            let mut start = it;
+            start.set_line_offset(0);
+            d.buffer.text(&start, &it, true).to_string()
+        });
+        println!("anvil: ai: Tab accepted: {accepted}, line now: {line:?}");
+    }));
+    steps.push(Step::Wait(300));
+    steps.push(Step::Shot("ai-accepted-light"));
+    // A model that is not installed: one hint, via Alt+\.
+    steps.push(act(move || {
+        let _ = settings().set_string("ai-inline-model", "qwen2.5-coder:32b");
+        crate::ui::actions::dispatch("edit.ai-suggest");
+    }));
+    steps.push(Step::Wait(1500));
+    steps.push(Step::Shot("ai-missing-model-light"));
+    steps.push(act(move || {
+        let s = settings();
+        let _ = s.set_string("ai-inline-model", "");
+        let _ = s.set_string("ollama-url", "http://127.0.0.1:1");
+        crate::ui::actions::dispatch("edit.ai-suggest");
+    }));
+    steps.push(Step::Wait(1500));
+    steps.push(Step::Shot("ai-unreachable-light"));
+    steps.push(act(move || {
+        let _ = settings().set_string("ollama-url", anvil_ai::ollama::DEFAULT_URL);
+        crate::ui::settings::show(Some("ai"));
+    }));
+    steps.push(Step::Wait(1500));
+    steps.push(Step::Shot("ai-settings-light"));
+    steps.push(Step::Theme(adw::ColorScheme::ForceDark));
+    steps.push(Step::Wait(600));
+    steps.push(Step::Shot("ai-settings-dark"));
+    steps.push(act(close_dialogs));
+    steps
+}
+
 fn ui_steps(sol: PathBuf) -> Vec<Step> {
     let project_dir = sol.parent().map(|d| d.join(sol.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())).unwrap_or_default();
     let files = ["Program.cs", "Person.cs", "ListNode.cs", "DoublyLinkedPersonList.cs"].map(|f| project_dir.join(f));

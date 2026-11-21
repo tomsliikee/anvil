@@ -34,6 +34,8 @@
     <key name="ai-enabled" type="b"><default>false</default><summary>Master switch for all AI features</summary></key>
     <key name="ai-inline" type="b"><default>false</default><summary>Inline completion (ghost text)</summary></key>
     <key name="ai-chat" type="b"><default>false</default><summary>AI chat panel</summary></key>
+    <key name="ai-inline-auto" type="b"><default>true</default><summary>Ghost text appears by itself after a typing pause (otherwise only on Alt+\)</summary></key>
+    <key name="ai-inline-delay" type="i"><range min="100" max="5000"/><default>600</default><summary>Typing pause in milliseconds before ghost text is requested</summary></key>
     <key name="ai-inline-model" type="s"><default>""</default><summary>Ollama model for inline completion</summary></key>
     <key name="ai-chat-model" type="s"><default>""</default><summary>Ollama model for the chat</summary></key>
     <key name="ollama-url" type="s"><default>"http://localhost:11434"</default><summary>Address of the local Ollama</summary></key>

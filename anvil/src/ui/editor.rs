@@ -1084,6 +1084,15 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
         }
     });
     view.add_controller(click);
+    // Arrow keys, Home, End: ghost text belongs to one caret position.
+    let weak = Rc::downgrade(&doc);
+    buffer.connect_cursor_position_notify(move |_| {
+        if let Some(d) = weak.upgrade()
+            && d.view.ghost().is_some_and(|(offset, _)| offset != d.cursor_offset())
+        {
+            d.view.set_ghost(None);
+        }
+    });
     crate::ui::lsp::attach_providers(&doc);
     crate::ui::lsp::attach_context_menu(&doc);
     Ok(doc)

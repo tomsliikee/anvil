@@ -60,21 +60,115 @@ fn editor_page() -> adw::PreferencesPage {
 }
 
 fn ai_page() -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder().title(tr("AI")).icon_name("starred-symbolic").build();
+    let page = adw::PreferencesPage::builder().title(tr("AI")).icon_name("starred-symbolic").name("ai").build();
     let g = adw::PreferencesGroup::new();
     g.set_description(Some(&tr("Local models through Ollama only. Nothing leaves this machine. Both parts are off by default; the master switch turns everything off for exams.")));
     g.add(&switch(&tr("AI features"), "ai-enabled"));
     g.add(&switch(&tr("Inline completion (Tab accepts)"), "ai-inline"));
     g.add(&switch(&tr("Chat panel"), "ai-chat"));
-    let model = adw::EntryRow::new();
-    model.set_title(&tr("Model for inline completion (empty: the first coder model)"));
-    crate::ui::window::app().settings.bind("ai-inline-model", &model, "text").build();
-    g.add(&model);
-    let url = adw::EntryRow::new();
-    url.set_title(&tr("Ollama address"));
-    crate::ui::window::app().settings.bind("ollama-url", &url, "text").build();
-    g.add(&url);
     page.add(&g);
+
+    let settings = crate::ui::window::app().settings.clone();
+    let inline = adw::PreferencesGroup::builder().title(tr("Inline completion")).description(tr("Tab accepts, Ctrl+Right accepts one word, Escape dismisses. Alt+\\ asks for a suggestion at any time.")).build();
+    inline.add(&switch(&tr("Suggest while typing"), "ai-inline-auto"));
+    let delay = adw::SpinRow::with_range(100.0, 5000.0, 50.0);
+    delay.set_title(&tr("Typing pause before a suggestion (ms)"));
+    settings.bind("ai-inline-delay", &delay, "value").build();
+    settings.bind("ai-inline-auto", &delay, "sensitive").get_only().build();
+    inline.add(&delay);
+    let model = adw::ComboRow::builder().title(tr("Model")).subtitle(tr("Small models answer fastest; without a GPU, 1.5b–3b are the usable size.")).build();
+    inline.add(&model);
+    page.add(&inline);
+
+    let og = adw::PreferencesGroup::builder().title(tr("Ollama")).build();
+    let url = adw::EntryRow::builder().title(tr("Address")).show_apply_button(true).build();
+    url.set_text(&settings.string("ollama-url"));
+    og.add(&url);
+    let status = adw::ActionRow::builder().title(tr("Connection")).subtitle(tr("Checking…")).build();
+    let refresh = gtk::Button::builder().icon_name("view-refresh-symbolic").tooltip_text(tr("Check again")).valign(gtk::Align::Center).css_classes(["flat"]).build();
+    status.add_suffix(&refresh);
+    og.add(&status);
+    page.add(&og);
+
+    // Names behind the combo's rows; "" is Automatic.
+    let names: Rc<RefCell<Vec<String>>> = Rc::default();
+    let filling = Rc::new(std::cell::Cell::new(false));
+    model.connect_selected_notify(glib::clone!(
+        #[strong]
+        names,
+        #[strong]
+        filling,
+        move |r| {
+            if filling.get() {
+                return;
+            }
+            if let Some(n) = names.borrow().get(r.selected() as usize) {
+                let _ = crate::ui::window::app().settings.set_string("ai-inline-model", n);
+                crate::ui::lsp::reset_ai_hint();
+            }
+        }
+    ));
+    let check = Rc::new(glib::clone!(
+        #[weak]
+        model,
+        #[weak]
+        status,
+        move || {
+            let settings = crate::ui::window::app().settings.clone();
+            let url = settings.string("ollama-url").to_string();
+            status.set_subtitle(&tr("Checking…"));
+            let names = names.clone();
+            let filling = filling.clone();
+            glib::spawn_future_local(async move {
+                let result = match anvil_ai::ollama::Ollama::new(&url) {
+                    Some(o) => crate::runtime::run(async move { o.models().await }).await,
+                    None => Err(anvil_ai::ollama::Error::Unreachable(String::new())),
+                };
+                let configured = settings.string("ai-inline-model").to_string();
+                let models = result.as_ref().map(Vec::as_slice).unwrap_or(&[]);
+                let auto = anvil_ai::ollama::pick_inline_model(models, "").ok();
+                let mut rows = vec![match &auto {
+                    Some(m) => trf("Automatic ({})", &[m]),
+                    None => tr("Automatic (smallest coder model)"),
+                }];
+                let mut list = vec![String::new()];
+                for m in models.iter().filter(|m| m.supports_fim()) {
+                    rows.push(format!("{}  ·  {:.1} GB", m.name, m.size as f64 / 1e9));
+                    list.push(m.name.clone());
+                }
+                if !configured.is_empty() && !list.contains(&configured) {
+                    rows.push(trf("{} (not installed)", &[&configured]));
+                    list.push(configured.clone());
+                }
+                filling.set(true);
+                let refs: Vec<&str> = rows.iter().map(String::as_str).collect();
+                model.set_model(Some(&gtk::StringList::new(&refs)));
+                model.set_selected(list.iter().position(|n| *n == configured).unwrap_or(0) as u32);
+                *names.borrow_mut() = list;
+                filling.set(false);
+                status.set_subtitle(&match &result {
+                    Ok(m) if m.iter().any(|m| m.supports_fim()) => trf("Connected: {} models installed", &[&m.len().to_string()]),
+                    Ok(_) => crate::ui::lsp::ai_error_hint(&anvil_ai::ollama::Error::NoModel, &url),
+                    Err(e) => crate::ui::lsp::ai_error_hint(e, &url),
+                });
+            });
+        }
+    ));
+    url.connect_apply(glib::clone!(
+        #[strong]
+        check,
+        move |e| {
+            let _ = crate::ui::window::app().settings.set_string("ollama-url", e.text().trim());
+            crate::ui::lsp::reset_ai_hint();
+            check();
+        }
+    ));
+    refresh.connect_clicked(glib::clone!(
+        #[strong]
+        check,
+        move |_| check()
+    ));
+    check();
     page
 }
 
