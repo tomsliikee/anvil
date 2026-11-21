@@ -229,6 +229,12 @@ impl Smooth {
 
 // ---- The caret ---------------------------------------------------------------
 
+/// Why the caret's place is recomputed: the text scrolled under it, the
+/// caret moved (it may slide), or the text was edited (it jumps).
+const SCROLLED: u8 = 0;
+const MOVED: u8 = 1;
+const EDITED: u8 = 2;
+
 mod imp {
     use super::*;
 
@@ -248,9 +254,9 @@ mod imp {
         pub blink_start: Cell<f64>,
         pub tick: RefCell<Option<gtk::TickCallbackId>>,
         pub timer: RefCell<Option<glib::SourceId>>,
-        /// A position update is queued; `true` if the caret moved (slide and
-        /// restart the blink) rather than the text under it scrolled.
-        pub pending: Cell<Option<bool>>,
+        /// A position update is queued, and why ([`SCROLLED`], [`MOVED`],
+        /// [`EDITED`]; the strongest reason of one frame counts).
+        pub pending: Cell<Option<u8>>,
     }
 
     #[glib::object_subclass]
@@ -312,27 +318,27 @@ impl Caret {
             if let Some(c) = weak.upgrade()
                 && *mark == b.get_insert()
             {
-                c.schedule(true);
+                c.schedule(MOVED);
             }
         });
         let weak = caret.downgrade();
         buffer.connect_changed(move |_| {
             if let Some(c) = weak.upgrade() {
-                c.schedule(true);
+                c.schedule(EDITED);
             }
         });
         for adj in [view.vadjustment(), view.hadjustment()].into_iter().flatten() {
             let weak = caret.downgrade();
             adj.connect_value_changed(move |_| {
                 if let Some(c) = weak.upgrade() {
-                    c.schedule(false);
+                    c.schedule(SCROLLED);
                 }
             });
             // A new page size: the view was resized.
             let weak = caret.downgrade();
             adj.connect_changed(move |_| {
                 if let Some(c) = weak.upgrade() {
-                    c.schedule(false);
+                    c.schedule(SCROLLED);
                 }
             });
         }
@@ -341,7 +347,7 @@ impl Caret {
         focus.connect_enter(move |_| {
             if let Some(c) = weak.upgrade() {
                 c.imp().blink_start.set(now_ms());
-                c.schedule(false);
+                c.schedule(SCROLLED);
             }
         });
         let weak = caret.downgrade();
@@ -366,7 +372,7 @@ impl Caret {
             if let Some(s) = gtk::Settings::default() {
                 s.set_gtk_cursor_blink(false);
             }
-            self.schedule(false);
+            self.schedule(SCROLLED);
         } else {
             view.remove_css_class("anvil-smooth-caret");
             if let Some(s) = gtk::Settings::default() {
@@ -377,13 +383,13 @@ impl Caret {
 
     /// Queues a position update before the next frame (many signals of one
     /// keystroke make one update).
-    fn schedule(&self, moved: bool) {
+    fn schedule(&self, reason: u8) {
         let imp = self.imp();
         if !imp.enabled.get() {
             return;
         }
         let queued = imp.pending.get();
-        imp.pending.set(Some(moved || queued == Some(true)));
+        imp.pending.set(Some(queued.map_or(reason, |q| q.max(reason))));
         if queued.is_some() {
             return;
         }
@@ -392,14 +398,15 @@ impl Caret {
         // the change.
         glib::idle_add_local_full(glib::Priority::HIGH_IDLE, move || {
             if let Some(c) = weak.upgrade() {
-                let moved = c.imp().pending.take().unwrap_or(false);
-                c.update(moved);
+                let reason = c.imp().pending.take().unwrap_or(SCROLLED);
+                c.update(reason);
             }
             glib::ControlFlow::Break
         });
     }
 
-    fn update(&self, moved: bool) {
+    fn update(&self, reason: u8) {
+        let moved = reason != SCROLLED;
         let imp = self.imp();
         let Some(view) = imp.view.borrow().clone() else { return };
         let buffer = view.buffer();
@@ -414,10 +421,11 @@ impl Caret {
         let now = now_ms();
         let shown = imp.current();
         let inside = |c: [f32; 4]| c[1] + c[3] > clip[1] && c[1] < clip[1] + clip[3];
-        // A slide only for short moves on screen (typing, arrows, a click
-        // nearby); a jump across the file lands at once.
+        // A slide only for short moves on screen (arrows, a click nearby);
+        // a jump across the file lands at once, and typing never slides:
+        // the caret would trail the letters, and every slide is frames.
         let near = (next[1] - shown[1]).abs() <= next[3] * 4.0 && (next[0] - shown[0]).abs() <= 600.0;
-        if moved && near && inside(shown) && inside(next) && shown != next {
+        if reason == MOVED && near && inside(shown) && inside(next) && shown != next {
             imp.from.set(shown);
             imp.move_start.set(now);
         } else {

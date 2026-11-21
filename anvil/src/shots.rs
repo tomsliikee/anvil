@@ -339,6 +339,12 @@ fn typing_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
         act(|| {
             crate::frame_log::report();
             crate::frame_log::reset();
+            // The editor's text copy must still equal the buffer.
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                let (s, e) = d.buffer.bounds();
+                let same = d.text() == d.buffer.text(&s, &e, true);
+                eprintln!("anvil: text copy after typing: {}", if same { "equal" } else { "DIFFERS" });
+            }
         }),
         Step::Wait(4000),
         act(|| {
