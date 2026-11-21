@@ -525,6 +525,8 @@ async fn pull_diagnostics(path: PathBuf) {
     let Some(client) = app.lsp.client() else { return };
     let Some(doc) = app.tabs.code_doc(&path) else { return };
     let version = doc.version.get();
+    // The text the server answers for (client() sent every change first).
+    let asked = doc.text();
     let ids: Vec<Option<String>> = {
         let r = app.lsp.running.borrow();
         let ids = r.as_ref().map(|r| r.identifiers.clone()).unwrap_or_default();
@@ -536,13 +538,20 @@ async fn pull_diagnostics(path: PathBuf) {
             params["identifier"] = json!(i);
         }
         let Ok(reply) = client.request_raw("textDocument/diagnostic", params).await else { continue };
-        if doc.version.get() != version {
-            return;
-        }
         if reply.get("kind").and_then(Value::as_str) == Some("unchanged") {
             continue;
         }
-        let items: Vec<lt::Diagnostic> = reply.get("items").and_then(|i| serde_json::from_value(i.clone()).ok()).unwrap_or_default();
+        let mut items: Vec<lt::Diagnostic> = reply.get("items").and_then(|i| serde_json::from_value(i.clone()).ok()).unwrap_or_default();
+        // Typed on meanwhile: the squiggles move with the text instead of
+        // waiting for a pause long enough for a whole round trip (which
+        // made them late); the next pull corrects them.
+        if doc.version.get() != version {
+            let change = anvil_lsp::position::change_event(&asked, &doc.text());
+            for d in &mut items {
+                d.range.start = anvil_lsp::position::shift(d.range.start, &change);
+                d.range.end = anvil_lsp::position::shift(d.range.end, &change);
+            }
+        }
         set_diagnostics(&path, id.as_deref().unwrap_or("pull"), items);
     }
 }

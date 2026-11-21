@@ -193,6 +193,8 @@ The GNOME 51 runtime has no VTE; the manifest builds **VTE 0.84.1** as a module.
 
 **Screenshot mode:** with `ANVIL_SCREENSHOT=<dir>` and `ANVIL_OPEN=<solution>` Anvil walks through itself and writes PNGs at 2x: start page, editor, Error List after a build, class diagram, Add New Item, Settings → Keyboard, ghost text, chat, dark. `ANVIL_SHOTS=ui` takes the quick pass instead (no build, no AI): four files opened as preview tabs in a row, the diagram, New Project, New Item and Settings in light and dark. `ANVIL_SHOTS=debug` with a `DebugDemo` solution (a loop at line 11, `Console.ReadLine` at line 17) runs F5 for real: breakpoint with hit count, Locals, steps, Watch, Breakpoints, Call Stack, input in the terminal, end of the program. `ANVIL_CONFIG_DIR` keeps such runs out of the real configuration, and a screenshot run is always its own process, never a window of a running Anvil.
 
+**Jank log:** `ANVIL_FRAME_LOG=1` writes every main-loop turn longer than 16 ms to stderr with the named work in it (frame layout and paint, name highlighting, completion, squiggles, Error List, designer) and a summary with keystroke-to-frame latency when Anvil quits. `ANVIL_SHOTS=typing` with `ANVIL_OPEN=<solution>` and `ANVIL_TYPE_FILE=<large .cs file with a // TYPE HERE line>` waits for Roslyn, types C# at about 14 keys a second with pauses, then rests and jumps 1700 lines, with one summary each.
+
 ```bash
 flatpak run --env=ANVIL_SCREENSHOT=$PWD/readmestuff/shots --env=ANVIL_OPEN=$PWD/target-sdk/shots/course/doublyLinkedList.slnx io.github.tomsliikee.Anvil
 ```
