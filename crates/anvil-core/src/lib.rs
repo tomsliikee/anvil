@@ -16,6 +16,7 @@ pub mod launch;
 pub mod layout;
 pub mod nuget;
 pub mod planner;
+pub mod routing;
 pub mod session;
 pub mod text;
 pub mod tokens;
