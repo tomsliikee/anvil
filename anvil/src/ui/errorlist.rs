@@ -210,8 +210,9 @@ impl ErrorList {
         let mut all: Vec<Entry> = self.build.borrow().clone();
         // IntelliSense entries for the same place as a build entry are the
         // same diagnostic; VS shows it once.
+        let built: std::collections::HashSet<(String, PathBuf, u32)> = all.iter().map(|b| (b.code.clone(), b.file.clone(), b.line)).collect();
         for e in self.intellisense.borrow().iter() {
-            if !all.iter().any(|b| b.code == e.code && b.file == e.file && b.line == e.line) {
+            if !built.contains(&(e.code.clone(), e.file.clone(), e.line)) {
                 all.push(e.clone());
             }
         }

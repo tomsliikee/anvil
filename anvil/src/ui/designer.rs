@@ -928,6 +928,12 @@ impl DiagramDoc {
 
     /// Parses every `.cs` of the project (open buffers first).
     fn reload_types(&self) {
+        self.canvas.st().types = parse_types(self.type_sources());
+    }
+
+    /// The project's source files, with the text of those open in a tab
+    /// (unsaved edits count); the rest is read from disk by [`parse_types`].
+    fn type_sources(&self) -> Vec<(PathBuf, Option<String>)> {
         let app = crate::ui::window::app();
         let sol = app.solution.borrow().clone();
         let files: Vec<PathBuf> = sol.as_ref().and_then(|s| s.project_named(&self.project)).map(|p| p.source_files()).unwrap_or_else(|| {
@@ -935,15 +941,7 @@ impl DiagramDoc {
             let dir = self.path.borrow().parent().map(Path::to_path_buf).unwrap_or_default();
             std::fs::read_dir(dir).map(|r| r.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == "cs")).collect()).unwrap_or_default()
         });
-        let mut types = Vec::new();
-        for f in files {
-            let text = app.tabs.code_doc(&f).map(|d| d.text()).or_else(|| TextFile::read(&f).ok().map(|t| t.text)).unwrap_or_default();
-            let st = csharp::parse(&text);
-            for (outer, t) in st.all_types() {
-                types.push(TypeInfo { full_name: t.full_name(&outer), decl: t.clone(), file: f.clone() });
-            }
-        }
-        self.canvas.st().types = types;
+        files.into_iter().map(|f| (f.clone(), app.tabs.code_doc(&f).map(|d| d.text()))).collect()
     }
 
     fn learn_hashes(&self) {
@@ -1718,12 +1716,27 @@ fn build_frame(canvas: &Canvas) -> (gtk::Box, gtk::ListBox, gtk::Label, gtk::Lab
     (widget, details, details_title, zoom_label)
 }
 
+/// The types declared in `sources` (path, open text); files without an
+/// open text are read from disk. Pure, so it runs off the main thread.
+fn parse_types(sources: Vec<(PathBuf, Option<String>)>) -> Vec<TypeInfo> {
+    let mut types = Vec::new();
+    for (f, text) in sources {
+        let text = text.or_else(|| TextFile::read(&f).ok().map(|t| t.text)).unwrap_or_default();
+        let st = csharp::parse(&text);
+        for (outer, t) in st.all_types() {
+            types.push(TypeInfo { full_name: t.full_name(&outer), decl: t.clone(), file: f.clone() });
+        }
+    }
+    types
+}
+
 /// Called when a code buffer changed: open diagrams of that project
 /// follow within one parse (150 ms after typing stops).
 pub fn code_changed(path: &Path) {
     thread_local! {
         static TIMER: RefCell<Option<glib::SourceId>> = const { RefCell::new(None) };
         static PENDING: RefCell<BTreeSet<PathBuf>> = RefCell::default();
+        static GENERATION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     }
     if path.extension().is_none_or(|e| e != "cs") {
         return;
@@ -1736,10 +1749,27 @@ pub fn code_changed(path: &Path) {
         let id = glib::timeout_add_local_once(std::time::Duration::from_millis(150), || {
             TIMER.with(|t| t.borrow_mut().take());
             PENDING.with(|p| p.borrow_mut().clear());
-            let _s = crate::frame_log::span("designer reparse");
+            let generation = GENERATION.with(|g| {
+                g.set(g.get() + 1);
+                g.get()
+            });
+            // Reading and parsing every file of the project takes longer
+            // than a frame in a medium solution: a worker does it, and only
+            // the newest pass reaches the canvas.
             for d in open_diagrams() {
-                d.reload_types();
-                d.rebuild();
+                let sources = d.type_sources();
+                let weak = Rc::downgrade(&d);
+                glib::spawn_future_local(async move {
+                    let Ok(types) = gio::spawn_blocking(move || parse_types(sources)).await else { return };
+                    if GENERATION.with(|g| g.get()) != generation {
+                        return;
+                    }
+                    if let Some(d) = weak.upgrade() {
+                        let _s = crate::frame_log::span("designer rebuild");
+                        d.canvas.st().types = types;
+                        d.rebuild();
+                    }
+                });
             }
         });
         *t.borrow_mut() = Some(id);

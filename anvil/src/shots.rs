@@ -23,6 +23,7 @@ pub fn requested() -> Option<PathBuf> {
 
 /// Saves what `widget` (a window or a dialog's toplevel) shows now.
 fn save(widget: &gtk::Widget, dir: &Path, name: &str) {
+    let _s = crate::frame_log::span("screenshot");
     let (w, h) = (widget.width() as f32, widget.height() as f32);
     let paintable = gtk::WidgetPaintable::new(Some(widget));
     let snapshot = gtk::Snapshot::new();
@@ -316,6 +317,16 @@ fn typing_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
         until(ready, 120_000),
         // Roslyn loads the projects after it is ready.
         Step::Wait(25_000),
+        act(close_dialogs),
+        act(move || {
+            // Again, now that the view has its size: the caret's line on
+            // screen, so typing paints what it changes.
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                let line = d.buffer.iter_at_mark(&d.buffer.get_insert()).line();
+                d.goto_line_col(line, 0);
+            }
+        }),
+        Step::Wait(1000),
         Step::Shot("typing-before"),
         act(move || {
             crate::frame_log::reset();

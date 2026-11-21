@@ -225,10 +225,28 @@ impl CodeDoc {
         *self.highlight_timer.borrow_mut() = Some(id);
     }
 
-    fn highlight_now(&self) {
+    /// Parses on a worker thread (a full tree-sitter pass over a large
+    /// file takes longer than a frame) and tags on the main thread, unless
+    /// the text changed meanwhile: the next pass is already scheduled then.
+    fn highlight_now(self: &Rc<Self>) {
+        let text = {
+            let _s = crate::frame_log::span("name highlight copy");
+            self.text()
+        };
+        let serial = self.change_serial.get();
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Ok(new) = gio::spawn_blocking(move || highlight::spans(&text)).await else { return };
+            if let Some(d) = weak.upgrade()
+                && d.change_serial.get() == serial
+            {
+                d.apply_highlights(new);
+            }
+        });
+    }
+
+    fn apply_highlights(&self, new: Vec<highlight::Span>) {
         let _s = crate::frame_log::span("name highlight");
-        let text = self.text();
-        let new = highlight::spans(&text);
         let count = self.buffer.char_count();
         let (old, old_count) = std::mem::take(&mut *self.highlights.borrow_mut());
         let range = if old.is_empty() && old_count == 0 { Some((0, count as usize)) } else { highlight::changed_range(&old, &new, (count - old_count) as isize) };
