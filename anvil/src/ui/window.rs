@@ -646,15 +646,14 @@ fn warn_startup_mismatch() {
     }
 }
 
+/// A failure, without a modal dialog: a toast, details in Output › General
+/// (see [`crate::ui::jobs::error`]).
 pub fn show_error(title: &str, detail: &str) {
-    let app = crate::ui::window::app();
-    let d = adw::AlertDialog::new(Some(title), Some(detail));
-    d.add_response("ok", &tr("OK"));
-    d.present(Some(&app.window));
+    crate::ui::jobs::error("General", title, detail);
 }
 
 pub fn toast(text: &str) {
-    crate::ui::window::app().toast.add_toast(adw::Toast::new(text));
+    crate::ui::jobs::info(text);
 }
 
 /// Shows a page of the bottom panel and makes sure the panel is open.

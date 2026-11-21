@@ -29,6 +29,7 @@ pub fn config_dir() -> PathBuf {
 }
 
 fn main() -> glib::ExitCode {
+    ui::jobs::mark_process_start();
     // The pinned language must be known before gettext binds; GSettings can
     // be read before GTK starts.
     let pinned = gio::SettingsSchemaSource::default()
