@@ -981,12 +981,28 @@ mod provider {
     use super::*;
     use glib::subclass::prelude::*;
 
+    /// One shown list: its store, every item the server gave for it and
+    /// the proposals made so far (only shown items become objects).
+    pub struct Last {
+        pub store: gio::ListStore,
+        pub items: Vec<lt::CompletionItem>,
+        pub made: RefCell<Vec<Option<Proposal>>>,
+    }
+
+    impl Last {
+        /// The best matches of `order` (at most 400) as proposals.
+        fn proposals(&self, order: &[usize]) -> Vec<Proposal> {
+            let mut made = self.made.borrow_mut();
+            order.iter().take(400).map(|&i| made[i].get_or_insert_with(|| Proposal::new(self.items[i].clone())).clone()).collect()
+        }
+    }
+
     #[derive(Default)]
     pub struct Provider {
         pub doc: RefCell<std::rc::Weak<CodeDoc>>,
-        /// The list shown last and every proposal the server gave for it:
-        /// typing (and Backspace) re-ranks these instead of asking again.
-        pub last: RefCell<Option<(gio::ListStore, Vec<Proposal>)>>,
+        /// The list shown last: typing (and Backspace) re-ranks its items
+        /// instead of asking the server again.
+        pub last: RefCell<Option<Last>>,
     }
 
     #[glib::object_subclass]
@@ -997,12 +1013,6 @@ mod provider {
     }
 
     impl ObjectImpl for Provider {}
-
-    /// The best `word` matches of `all`, best first, at most 400.
-    fn ranked(all: &[Proposal], word: &str) -> Vec<Proposal> {
-        let items: Vec<lt::CompletionItem> = all.iter().map(Proposal::item).collect();
-        anvil_lsp::completion::rank(&items, word).into_iter().take(400).map(|i| all[i].clone()).collect()
-    }
 
     /// The identifier before the caret, as typed by now.
     fn word_before_caret(doc: &CodeDoc) -> String {
@@ -1035,18 +1045,29 @@ mod provider {
                 let (Some(doc), Some(client)) = (doc, crate::ui::window::app().lsp.client()) else { return Ok(store.upcast()) };
                 let params = position_params(&doc);
                 let v = client.request_raw("textDocument/completion", params).await.unwrap_or(Value::Null);
-                let _s = crate::frame_log::span("completion list");
-                let items: Vec<lt::CompletionItem> = match serde_json::from_value::<lt::CompletionResponse>(v) {
-                    Ok(lt::CompletionResponse::Array(a)) => a,
-                    Ok(lt::CompletionResponse::List(l)) => l.items,
-                    Err(_) => Vec::new(),
-                };
-                let all: Vec<Proposal> = items.into_iter().map(Proposal::new).collect();
                 // Keys typed while Roslyn answered narrow the list now; an
                 // empty answer for an older version would close the popup.
-                store.splice(0, 0, &ranked(&all, &word_before_caret(&doc)));
+                let word = word_before_caret(&doc);
+                // Roslyn's lists run to thousands of items: decoding and
+                // ranking them took 16-25 ms on the main thread.
+                let Ok((items, order)) = gio::spawn_blocking(move || {
+                    let items: Vec<lt::CompletionItem> = match serde_json::from_value::<lt::CompletionResponse>(v) {
+                        Ok(lt::CompletionResponse::Array(a)) => a,
+                        Ok(lt::CompletionResponse::List(l)) => l.items,
+                        Err(_) => Vec::new(),
+                    };
+                    let order = anvil_lsp::completion::rank(&items, &word);
+                    (items, order)
+                })
+                .await
+                else {
+                    return Ok(store.upcast());
+                };
+                let _s = crate::frame_log::span("completion list");
+                let last = Last { store: store.clone(), made: RefCell::new(vec![None; items.len()]), items };
+                store.splice(0, 0, &last.proposals(&order));
                 if let Some(p) = provider.upgrade() {
-                    *p.imp().last.borrow_mut() = Some((store.clone(), all));
+                    *p.imp().last.borrow_mut() = Some(last);
                 }
                 Ok(store.upcast())
             })
@@ -1057,8 +1078,8 @@ mod provider {
             let word = context.word();
             let Some(store) = model.downcast_ref::<gio::ListStore>() else { return };
             let last = self.last.borrow();
-            let Some((_, all)) = last.as_ref().filter(|(s, _)| s == store) else { return };
-            let next = ranked(all, &word);
+            let Some(last) = last.as_ref().filter(|l| &l.store == store) else { return };
+            let next = last.proposals(&anvil_lsp::completion::rank(&last.items, &word));
             // One splice, and none when nothing changed: the list neither
             // flickers nor loses its place.
             let same = next.len() == store.n_items() as usize && next.iter().enumerate().all(|(i, p)| store.item(i as u32).as_ref() == Some(p.upcast_ref::<glib::Object>()));
