@@ -94,6 +94,15 @@ pub fn run(dir: PathBuf) {
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
+    // ANVIL_SHOTS=debug-repro: F5 on any solution, driven by
+    // ANVIL_DEBUG_* (see `debug_repro_steps`), with the session logged.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("debug-repro")
+        && let Ok(open) = std::env::var("ANVIL_OPEN")
+    {
+        steps.extend(debug_repro_steps(PathBuf::from(open)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
     if let Ok(open) = std::env::var("ANVIL_OPEN") {
         let sol = PathBuf::from(&open);
         let project_dir = sol.parent().map(|d| d.join(sol.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())).unwrap_or_default();
@@ -341,6 +350,117 @@ fn debug_steps(sol: PathBuf) -> Vec<Step> {
             window::save_session();
         }),
     ]
+}
+
+fn log_debugger(what: &'static str) -> Step {
+    act(move || println!("anvil: --- {what}\n{}", crate::ui::window::app().debugger.describe()))
+}
+
+/// F5 on a real solution: `ANVIL_DEBUG_STARTUP` (project name),
+/// `ANVIL_DEBUG_BREAKS` (`src/Lib/Calc.cs:10;Program.cs:7`, relative to
+/// the solution), `ANVIL_DEBUG_OPEN=after` (open no file before F5),
+/// `ANVIL_DEBUG_INPUT` (a line for `Console.ReadLine`),
+/// `ANVIL_DEBUG_END=stop|restart|continue` (default continue).
+fn debug_repro_steps(sol: PathBuf) -> Vec<Step> {
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let dir = sol.parent().map(Path::to_path_buf).unwrap_or_default();
+    let breaks: Vec<(PathBuf, u32)> = var("ANVIL_DEBUG_BREAKS")
+        .unwrap_or_default()
+        .split(';')
+        .filter_map(|b| b.rsplit_once(':'))
+        .filter_map(|(f, l)| Some((dir.join(f), l.trim().parse().ok()?)))
+        .collect();
+    let startup = var("ANVIL_DEBUG_STARTUP");
+    let open_before = var("ANVIL_DEBUG_OPEN").as_deref() != Some("after");
+    let input = var("ANVIL_DEBUG_INPUT");
+    let end = var("ANVIL_DEBUG_END").unwrap_or_else(|| "continue".into());
+    let stopped = || crate::ui::window::app().debugger.is_stopped();
+    let settled = || {
+        let d = &crate::ui::window::app().debugger;
+        d.is_stopped() || (!d.is_active() && !d.is_starting())
+    };
+    let mut steps = vec![
+        act(move || window::open_path(&sol)),
+        Step::Wait(2000),
+        act(move || {
+            let app = crate::ui::window::app();
+            if let Some(s) = &startup {
+                window::set_startup_project(s);
+            }
+            app.debugger.clear_breakpoints();
+            for (f, l) in &breaks {
+                if open_before {
+                    app.tabs.open(f, false);
+                }
+                app.debugger.toggle_breakpoint(f, *l);
+            }
+            app.session.borrow_mut().watches = vec!["args".into()];
+        }),
+        Step::Wait(800),
+        Step::Shot("repro-set"),
+        command("debug.start"),
+        Step::Wait(1500),
+        log_debugger("starting"),
+        Step::Shot("repro-starting"),
+        until(settled, 120_000),
+        Step::Wait(1500),
+        log_debugger("first stop"),
+        Step::Shot("repro-stop1"),
+    ];
+    match end.as_str() {
+        "stop" | "restart" => {
+            steps.extend([
+                command("debug.step-over"),
+                until(stopped, 10_000),
+                Step::Wait(1000),
+                log_debugger("after step over"),
+                Step::Shot("repro-step"),
+                command(if end == "stop" { "debug.stop" } else { "debug.restart" }),
+                Step::Wait(800),
+                log_debugger("right after stop/restart"),
+                until(settled, 120_000),
+                Step::Wait(1500),
+                log_debugger("after stop/restart"),
+                Step::Shot("repro-end"),
+            ]);
+            if end == "restart" {
+                steps.push(command("debug.stop"));
+                steps.push(until(|| !crate::ui::window::app().debugger.is_active(), 10_000));
+            }
+        }
+        _ => {
+            for i in 0..6 {
+                steps.extend([
+                    act(|| {
+                        if crate::ui::window::app().debugger.is_stopped() {
+                            crate::ui::actions::dispatch("debug.start");
+                        }
+                    }),
+                    Step::Wait(700),
+                ]);
+                if i == 0 {
+                    steps.push(Step::Shot("repro-continued"));
+                }
+                if let Some(text) = input.clone() {
+                    steps.push(act(move || {
+                        let app = crate::ui::window::app();
+                        if app.debugger.is_active() && !app.debugger.is_stopped() {
+                            app.terminal.send_input(&format!("{text}\r"));
+                        }
+                    }));
+                }
+                steps.extend([until(settled, 15_000), Step::Wait(800), log_debugger("next stop")]);
+            }
+            steps.extend([until(|| !crate::ui::window::app().debugger.is_active(), 15_000), Step::Wait(800), act(|| window::show_bottom("terminal")), Step::Wait(300), Step::Shot("repro-ended")]);
+        }
+    }
+    steps.push(act(|| {
+        let app = crate::ui::window::app();
+        app.debugger.clear_breakpoints();
+        app.session.borrow_mut().watches.clear();
+        window::save_session();
+    }));
+    steps
 }
 
 fn next(dir: Rc<PathBuf>, steps: Rc<Vec<Step>>, i: usize) {

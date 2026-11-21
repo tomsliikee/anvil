@@ -35,6 +35,15 @@ impl Project {
             .unwrap_or_else(|| crate::templates::safe_identifier_path(&self.name))
     }
 
+    /// Whether the project file says it builds a program (an `OutputType`
+    /// set in `Directory.Build.props` is not seen here).
+    pub fn is_startable(&self) -> bool {
+        self.csproj.as_ref().is_some_and(|c| {
+            let ty = c.property("OutputType").unwrap_or_default();
+            (ty.eq_ignore_ascii_case("exe") || ty.eq_ignore_ascii_case("winexe")) && !c.is_test_project()
+        })
+    }
+
     /// The `.cs` files that belong to the project: SDK-style globbing of
     /// `**/*.cs`, minus `bin/`, `obj/` and `<Compile Remove>`.
     pub fn source_files(&self) -> Vec<PathBuf> {
@@ -94,6 +103,7 @@ impl std::error::Error for OpenError {}
 impl Solution {
     pub fn open(path: &Path) -> Result<Solution, OpenError> {
         let file = TextFile::read(path).map_err(|e| OpenError(format!("{}: {e}", path.display())))?;
+        let path = &normalize(path);
         let dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
         let (format, refs, folders) = match ext.as_str() {
@@ -121,6 +131,14 @@ impl Solution {
         self.projects.first()
     }
 
+    /// The project F5 starts when the user has not picked one: the first
+    /// that can run (`OutputType` `Exe` or `WinExe`, not a test project),
+    /// else the first. VS would start the first project even when it is a
+    /// class library and then refuse to.
+    pub fn default_startup(&self) -> Option<&Project> {
+        self.projects.iter().find(|p| p.is_startable()).or_else(|| self.first_project())
+    }
+
     pub fn project_named(&self, name: &str) -> Option<&Project> {
         self.projects.iter().find(|p| p.name == name)
     }
@@ -144,8 +162,32 @@ impl Solution {
     }
 }
 
+/// `a/./b/../c` as `a/c`, without touching the disk: the compiler writes
+/// such paths into the PDB, and netcoredbg binds a breakpoint only when
+/// its path is exactly that one (tested with netcoredbg 3.2: `/s/./P.cs`
+/// and `/s/x/../P.cs` never bind). Symbolic links stay as they are, as
+/// MSBuild keeps them.
+pub fn normalize(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in path.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => match out.components().next_back() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir | Component::Prefix(_)) => {}
+                _ => out.push(".."),
+            },
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 fn load_project(dir: &Path, r: ProjectRef) -> Project {
-    let path = dir.join(&r.path);
+    let path = normalize(&dir.join(&r.path));
     let csproj = TextFile::read(&path).ok().and_then(|f| Csproj::parse(&f.text).ok());
     Project { name: r.name, dir: path.parent().map(Path::to_path_buf).unwrap_or_default(), path, folder: r.folder, csproj }
 }
@@ -177,6 +219,23 @@ mod tests {
         let s = Solution::open(&fixtures().join("sdk-samples/Sample.sln")).unwrap();
         assert_eq!(s.first_project().unwrap().name, "App");
         assert_eq!(s.project_named("Lib").unwrap().root_namespace(), "Lib");
+    }
+
+    #[test]
+    fn default_startup_skips_libraries() {
+        let s = Solution::open(&fixtures().join("sdk-samples/Sample2.slnx")).unwrap();
+        assert!(!s.project_named("Lib").unwrap().is_startable());
+        assert_eq!(s.default_startup().unwrap().name, "App");
+    }
+
+    #[test]
+    fn paths_are_normalized() {
+        assert_eq!(normalize(Path::new("/s/./App/../Lib/C.cs")), Path::new("/s/Lib/C.cs"));
+        assert_eq!(normalize(Path::new("/s//Übung 1/P.cs")), Path::new("/s/Übung 1/P.cs"));
+        assert_eq!(normalize(Path::new("../x/./y")), Path::new("../x/y"));
+        assert_eq!(normalize(Path::new("/..")), Path::new("/"));
+        let s = Solution::open(&fixtures().join("sdk-samples/./Sample.sln")).unwrap();
+        assert!(!s.path.to_string_lossy().contains("/./"));
     }
 
     #[test]

@@ -114,6 +114,41 @@ pub fn parse_target_path(stdout: &str) -> Option<PathBuf> {
     line.ends_with(".dll").then(|| PathBuf::from(line))
 }
 
+/// The MSBuild properties F5 asks for in one call.
+pub const PROGRAM_PROPERTIES: [&str; 3] = ["TargetPath", "OutputType", "TargetFrameworks"];
+
+/// What MSBuild says about the startup project's program.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ProgramInfo {
+    /// Empty for a multi-targeting project unless one framework is given.
+    pub target_path: Option<PathBuf>,
+    pub output_type: String,
+    pub frameworks: Vec<String>,
+}
+
+impl ProgramInfo {
+    /// Only an executable can be started; VS refuses a class library
+    /// ("A project with an Output Type of Class Library cannot be started
+    /// directly").
+    pub fn is_startable(&self) -> bool {
+        self.output_type.eq_ignore_ascii_case("exe") || self.output_type.eq_ignore_ascii_case("winexe")
+    }
+}
+
+/// The JSON `dotnet msbuild -getProperty:A -getProperty:B` prints (lines
+/// before it, such as warnings, are skipped).
+pub fn parse_program_info(stdout: &str) -> Option<ProgramInfo> {
+    let json: Value = serde_json::from_str(stdout.get(stdout.find('{')?..)?.trim()).ok()?;
+    let props = json.get("Properties")?;
+    let s = |k: &str| props.get(k).and_then(Value::as_str).map(str::trim).unwrap_or("").to_owned();
+    let target = s("TargetPath");
+    Some(ProgramInfo {
+        target_path: (!target.is_empty()).then(|| PathBuf::from(target)),
+        output_type: s("OutputType"),
+        frameworks: s("TargetFrameworks").split(';').map(str::trim).filter(|f| !f.is_empty()).map(str::to_owned).collect(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,5 +172,23 @@ mod tests {
         assert_eq!(parse_target_path("/p/bin/Debug/net10.0/App.dll\n"), Some(PathBuf::from("/p/bin/Debug/net10.0/App.dll")));
         assert_eq!(parse_target_path("warning: x\n  /p/App.dll  \n\n"), Some(PathBuf::from("/p/App.dll")));
         assert_eq!(parse_target_path("MSBUILD : error MSB1009\n"), None);
+    }
+
+    #[test]
+    fn program_info_from_msbuild() {
+        // As the .NET 10 SDK prints it for a class library and for a
+        // multi-targeting console app.
+        let lib = "{\n  \"Properties\": {\n    \"TargetPath\": \"/s/\\u00DCbung 1/Lib/bin/Debug/net10.0/Lib.dll\",\n    \"OutputType\": \"Library\",\n    \"TargetFrameworks\": \"\"\n  }\n}\n";
+        let info = parse_program_info(lib).unwrap();
+        assert_eq!(info.target_path, Some(PathBuf::from("/s/Übung 1/Lib/bin/Debug/net10.0/Lib.dll")));
+        assert!(!info.is_startable());
+        assert!(info.frameworks.is_empty());
+        let multi = "warning: x\n{\"Properties\": {\"TargetPath\": \"\", \"OutputType\": \"Exe\", \"TargetFrameworks\": \"net9.0;net10.0\"}}";
+        let info = parse_program_info(multi).unwrap();
+        assert_eq!(info.target_path, None);
+        assert!(info.is_startable());
+        assert_eq!(info.frameworks, ["net9.0", "net10.0"]);
+        assert!(ProgramInfo { output_type: "WinExe".into(), ..Default::default() }.is_startable());
+        assert_eq!(parse_program_info("MSBUILD : error MSB1009"), None);
     }
 }

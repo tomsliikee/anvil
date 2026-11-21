@@ -237,6 +237,32 @@ impl Debugger {
         self.refresh_breakpoint_list();
     }
 
+    pub fn is_starting(&self) -> bool {
+        self.starting.get() || self.downloading.get()
+    }
+
+    /// The session in one block of text (the screenshot runs' log).
+    pub fn describe(&self) -> String {
+        let s = self.session.borrow();
+        let state = match s.as_ref() {
+            None if self.is_starting() => "starting".to_owned(),
+            None => "no session".to_owned(),
+            Some(s) if s.stopped => format!("stopped at {:?}", s.current),
+            Some(_) => "running".to_owned(),
+        };
+        let marks: Vec<String> = self.breakpoints().iter().map(|b| format!("{}:{} verified={:?}", file_name(&b.file), b.line, self.verified.borrow().get(&(b.file.clone(), b.line)))).collect();
+        let app = crate::ui::window::app();
+        let pages: Vec<String> = self.pages.borrow().iter().filter(|(_, n, _)| app.bottom.child_by_name(n).is_some()).map(|(_, n, _)| n.to_string()).collect();
+        format!(
+            "state: {state}\nstatus: {}\nbreakpoints: {marks:?}\nlocals: {:?}\nwatch: {:?}\nframes: {}\ndebug pages: {pages:?}\ndebug toolbar: {}",
+            app.status.message(),
+            self.locals.roots(),
+            self.watch.roots(),
+            self.stack_frames.borrow().len(),
+            app.toolbar.debug_controls.is_visible()
+        )
+    }
+
     /// The stack frame the variable windows show.
     pub fn frame(&self) -> Option<i64> {
         self.session.borrow().as_ref().and_then(|s| s.frame)
