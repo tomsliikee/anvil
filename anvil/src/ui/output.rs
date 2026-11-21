@@ -7,7 +7,10 @@ use adw::prelude::*;
 
 use crate::i18n::tr;
 
-const PANES: &[&str] = &["Build", "Debug", "Tests", "Git", "Package Manager", "Language Server", "AI"];
+/// Lines a pane keeps; older ones are dropped in blocks of a tenth.
+const MAX_LINES: i32 = 20_000;
+
+const PANES:&[&str] = &["Build", "Debug", "Tests", "Git", "Package Manager", "Language Server", "AI"];
 
 pub struct Output {
     pub widget: gtk::Box,
@@ -56,9 +59,18 @@ impl Output {
     }
 
     pub fn append(&self, pane: &str, text: &str) {
+        let _s = crate::frame_log::span("output append");
         let b = self.buffer(pane);
         let mut end = b.end_iter();
         b.insert(&mut end, text);
+        // Roslyn and long builds write without end; a pane keeps its last
+        // lines, so appending and wrapping stay cheap after hours.
+        let extra = b.line_count() - MAX_LINES;
+        if extra > MAX_LINES / 10 {
+            let mut s = b.start_iter();
+            let mut cut = b.iter_at_line(extra).unwrap_or_else(|| b.end_iter());
+            b.delete(&mut s, &mut cut);
+        }
         if self.view.buffer() == b {
             let mark = b.create_mark(None, &b.end_iter(), false);
             self.view.scroll_mark_onscreen(&mark);

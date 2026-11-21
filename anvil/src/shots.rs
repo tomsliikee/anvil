@@ -85,6 +85,15 @@ pub fn run(dir: PathBuf) {
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
+    // ANVIL_SHOTS=typing: types into ANVIL_TYPE_FILE (a large file of the
+    // solution, at its `// TYPE HERE` line) for the frame log.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("typing")
+        && let (Ok(open), Ok(file)) = (std::env::var("ANVIL_OPEN"), std::env::var("ANVIL_TYPE_FILE"))
+    {
+        steps.extend(typing_steps(PathBuf::from(open), PathBuf::from(file)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
     // ANVIL_SHOTS=debug: F5 for real with netcoredbg on a sample console
     // app (Program.cs with a loop at line 11 and a Console.ReadLine).
     if std::env::var("ANVIL_SHOTS").as_deref() == Ok("debug")
@@ -277,6 +286,72 @@ fn ui_steps(sol: PathBuf) -> Vec<Step> {
         act(close_dialogs),
     ]);
     steps
+}
+
+/// Waits for Roslyn, then types C# at about 14 keys a second, with a
+/// pause after each line (where highlighting, diagnostics and the
+/// designer catch up), and scrolls; `ANVIL_TYPE_DIAGRAM` opens a class
+/// diagram beside it. The frame log's summary covers the typing only.
+fn typing_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
+    let diagram = std::env::var("ANVIL_TYPE_DIAGRAM").ok().map(PathBuf::from);
+    let lines: usize = std::env::var("ANVIL_TYPE_LINES").ok().and_then(|v| v.parse().ok()).unwrap_or(12);
+    let ready = || crate::ui::window::app().lsp.client().is_some();
+    let mut steps = vec![act(move || window::open_path(&sol)), Step::Wait(1500)];
+    if let Some(d) = diagram {
+        steps.push(act(move || {
+            crate::ui::window::app().tabs.open(&d, false);
+        }));
+        steps.push(Step::Wait(800));
+    }
+    steps.extend([
+        act(move || {
+            let app = crate::ui::window::app();
+            app.tabs.open(&file, false);
+            if let Some(d) = app.tabs.current_code()
+                && let Some(i) = d.text().find("// TYPE HERE")
+            {
+                d.goto_line_col(d.iter_at_byte(i).line() + 1, 0);
+            }
+        }),
+        until(ready, 120_000),
+        // Roslyn loads the projects after it is ready.
+        Step::Wait(25_000),
+        Step::Shot("typing-before"),
+        act(move || {
+            crate::frame_log::reset();
+            type_script(SCRIPT.repeat(lines.div_ceil(3)).chars().collect(), 0);
+        }),
+        until(|| TYPING_DONE.with(std::cell::Cell::get), 600_000),
+        Step::Shot("typing-after"),
+        Step::Wait(2000),
+        act(|| {
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                d.buffer.set_modified(false);
+            }
+        }),
+    ]);
+    steps
+}
+
+const SCRIPT: &str = "            var list = new System.Collections.Generic.List<int>();\n            list.Add(list.Count + 42);\n            Console.WriteLine(list.Count);\n";
+
+thread_local! {
+    static TYPING_DONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// One key per call, as the text view's own `insert-at-cursor` (the path
+/// typed text takes), 70 ms apart and 700 ms after a line.
+fn type_script(chars: Vec<char>, i: usize) {
+    let Some(&c) = chars.get(i) else {
+        TYPING_DONE.with(|d| d.set(true));
+        return;
+    };
+    if let Some(d) = crate::ui::window::app().tabs.current_code() {
+        crate::frame_log::keystroke();
+        d.view.emit_insert_at_cursor(&c.to_string());
+    }
+    let delay = if c == '\n' { 700 } else { 70 };
+    glib::timeout_add_local_once(Duration::from_millis(delay), move || type_script(chars, i + 1));
 }
 
 /// Breakpoint with hit count 3 in the loop, F5, Locals, a step (changed

@@ -73,6 +73,7 @@ impl Lsp {
     }
 
     fn flush_changes(&self) {
+        let _s = crate::frame_log::span("lsp didChange");
         if let Some(id) = self.flush_source.borrow_mut().take() {
             id.remove();
         }
@@ -467,10 +468,12 @@ fn set_diagnostics(path: &Path, source: &str, list: Vec<lt::Diagnostic>) {
     if let Some(doc) = app.tabs.code_doc(path) {
         apply_squiggles(&doc);
     }
+    let _s = crate::frame_log::span("error list");
     app.errors.set_intellisense(app.lsp.all_diagnostics());
 }
 
 fn apply_squiggles(doc: &CodeDoc) {
+    let _s = crate::frame_log::span("squiggles");
     let app = crate::ui::window::app();
     let all: Vec<lt::Diagnostic> = app.lsp.diags.borrow().get(&doc.path()).map(|m| m.values().flatten().cloned().collect()).unwrap_or_default();
     let (s, e) = doc.buffer.bounds();
@@ -1016,6 +1019,7 @@ mod provider {
                 if doc.version.get() != version {
                     return Ok(store.upcast());
                 }
+                let _s = crate::frame_log::span("completion list");
                 let items: Vec<lt::CompletionItem> = match serde_json::from_value::<lt::CompletionResponse>(v) {
                     Ok(lt::CompletionResponse::Array(a)) => a,
                     Ok(lt::CompletionResponse::List(l)) => l.items,
@@ -1035,6 +1039,7 @@ mod provider {
         }
 
         fn refilter(&self, context: &sourceview5::CompletionContext, model: &gio::ListModel) {
+            let _s = crate::frame_log::span("completion refilter");
             let word = context.word().to_lowercase();
             let Some(store) = model.downcast_ref::<gio::ListStore>() else { return };
             let mut keep = Vec::new();
@@ -1363,7 +1368,10 @@ async fn ai_complete(doc: Rc<CodeDoc>) {
     }
     let model = app.settings.string("ai-inline-model").to_string();
     let url = app.settings.string("ollama-url").to_string();
-    let sigs = crate::ui::chat::project_signatures(2000);
+    let sigs = {
+        let _s = crate::frame_log::span("ai context");
+        crate::ui::chat::project_signatures(2000)
+    };
     let (prefix, suffix) = anvil_ai::context::fim(&text, cursor, &sigs, 6000);
     let Some(ollama) = anvil_ai::ollama::Ollama::new(&url) else { return };
     let result = crate::runtime::run(async move {

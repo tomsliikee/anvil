@@ -23,6 +23,34 @@ pub fn to_offset(text: &str, pos: Position) -> usize {
     line_end
 }
 
+/// Line starts of one text, for many [`to_offset`] lookups without
+/// walking the text from its start for each (diagnostics come in hundreds).
+pub struct Lines {
+    starts: Vec<usize>,
+}
+
+impl Lines {
+    pub fn new(text: &str) -> Lines {
+        let mut starts = vec![0];
+        starts.extend(text.match_indices('\n').map(|(i, _)| i + 1));
+        Lines { starts }
+    }
+
+    /// The same as [`to_offset`] on the text the lines were taken from.
+    pub fn offset(&self, text: &str, pos: Position) -> usize {
+        let Some(&line_start) = self.starts.get(pos.line as usize) else { return text.len() };
+        let line_end = self.starts.get(pos.line as usize + 1).map_or(text.len(), |s| s - 1);
+        let mut units = 0u32;
+        for (i, c) in text[line_start..line_end].char_indices() {
+            if units >= pos.character {
+                return line_start + i;
+            }
+            units += c.len_utf16() as u32;
+        }
+        line_end
+    }
+}
+
 pub fn to_position(text: &str, offset: usize) -> Position {
     let offset = offset.min(text.len());
     let before = &text[..offset];
@@ -79,6 +107,18 @@ mod tests {
             let e = change_event(old, new);
             assert!(e.range.is_some());
             assert_eq!(apply(old, &e), new, "{old} -> {new}");
+        }
+    }
+
+    #[test]
+    fn lines_agree_with_to_offset() {
+        let t = "ab\nü😀x\n\nend";
+        let lines = Lines::new(t);
+        for line in 0..6 {
+            for character in 0..6 {
+                let p = Position { line, character };
+                assert_eq!(lines.offset(t, p), to_offset(t, p), "{p:?}");
+            }
         }
     }
 

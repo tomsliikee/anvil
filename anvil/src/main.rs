@@ -1,5 +1,6 @@
 mod app;
 mod commands;
+mod frame_log;
 mod host;
 mod i18n;
 mod motion;
@@ -37,5 +38,6 @@ fn main() -> glib::ExitCode {
         .filter(|l| l != "system");
     i18n::init(pinned.as_deref());
     gio::resources_register_include!("anvil.gresource").expect("bundled resources");
+    frame_log::install();
     app::build().run()
 }

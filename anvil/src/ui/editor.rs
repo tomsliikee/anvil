@@ -226,6 +226,7 @@ impl CodeDoc {
     }
 
     fn highlight_now(&self) {
+        let _s = crate::frame_log::span("name highlight");
         let text = self.text();
         let new = highlight::spans(&text);
         let count = self.buffer.char_count();
@@ -1017,6 +1018,7 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
     let weak = Rc::downgrade(&doc);
     buffer.connect_changed(move |_| {
         let Some(doc) = weak.upgrade() else { return };
+        let _s = crate::frame_log::span("buffer changed");
         doc.version.set(doc.version.get() + 1);
         doc.change_serial.set(doc.change_serial.get() + 1);
         doc.schedule_highlight();

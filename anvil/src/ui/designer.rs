@@ -1736,6 +1736,7 @@ pub fn code_changed(path: &Path) {
         let id = glib::timeout_add_local_once(std::time::Duration::from_millis(150), || {
             TIMER.with(|t| t.borrow_mut().take());
             PENDING.with(|p| p.borrow_mut().clear());
+            let _s = crate::frame_log::span("designer reparse");
             for d in open_diagrams() {
                 d.reload_types();
                 d.rebuild();
