@@ -68,7 +68,7 @@ fn end_turn(now: Instant) {
                 None => merged.push((name, d)),
             }
         }
-        merged.sort_by(|a, b| b.1.cmp(&a.1));
+        merged.sort_by_key(|m| std::cmp::Reverse(m.1));
         let named: Duration = merged.iter().map(|(_, d)| *d).sum();
         let rest = total.saturating_sub(named);
         let top = merged.first().filter(|(_, d)| *d >= rest).map_or("(unnamed)", |(n, _)| *n);
@@ -226,7 +226,7 @@ pub fn report() {
             eprintln!("anvil-frame: keystroke to frame: {} keys, p50 {:.1} ms, p95 {:.1} ms, worst {:.1} ms", l.len(), at(0.5), at(0.95), ms(l[l.len() - 1]));
         }
         let mut blame = s.blame.clone();
-        blame.sort_by(|a, b| b.1.cmp(&a.1));
+        blame.sort_by_key(|b| std::cmp::Reverse(b.1));
         for (name, d, top) in blame.iter().take(12) {
             eprintln!("anvil-frame:   {name:<28} {:8.1} ms in stalls, largest part of {top}", ms(*d));
         }
