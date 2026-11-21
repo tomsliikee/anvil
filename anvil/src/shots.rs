@@ -334,6 +334,17 @@ fn typing_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
         }),
         until(|| TYPING_DONE.with(std::cell::Cell::get), 600_000),
         Step::Shot("typing-after"),
+        // The typing summary, then one for four seconds at rest (the caret
+        // blinks); the summary at exit covers the glide.
+        act(|| {
+            crate::frame_log::report();
+            crate::frame_log::reset();
+        }),
+        Step::Wait(4000),
+        act(|| {
+            crate::frame_log::report();
+            crate::frame_log::reset();
+        }),
         // A jump far down: the glide in flight, then where it lands.
         act(|| {
             if let Some(d) = crate::ui::window::app().tabs.current_code() {
