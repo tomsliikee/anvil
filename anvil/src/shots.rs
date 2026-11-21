@@ -250,8 +250,10 @@ fn ai_steps(file: PathBuf) -> Vec<Step> {
         }),
         Step::Wait(800),
     ];
-    // Typed as a person types: every key aborts the request in flight.
-    for c in "Console.Wri".chars() {
+    // Typed as a person types: every key aborts the request in flight;
+    // the first keys come slowly, so requests start (and the model loads)
+    // and are aborted by the next key.
+    for (i, c) in "Console.Wri".chars().enumerate() {
         steps.push(act(move || {
             if let Some(d) = crate::ui::window::app().tabs.current_code() {
                 d.buffer.begin_user_action();
@@ -259,10 +261,12 @@ fn ai_steps(file: PathBuf) -> Vec<Step> {
                 d.buffer.end_user_action();
             }
         }));
-        steps.push(Step::Wait(120));
+        steps.push(Step::Wait(if i < 4 { 900 } else { 120 }));
     }
     let s0 = started.clone();
     steps.push(act(move || s0.set(std::time::Instant::now())));
+    steps.push(Step::Wait(3000));
+    steps.push(Step::Shot("ai-loading-light"));
     steps.push(until(move || ghost().is_some(), 90000));
     let s1 = started.clone();
     steps.push(act(move || println!("anvil: ai: ghost after the pause in {} ms: {:?}", s1.get().elapsed().as_millis(), ghost().map(|g| g.1))));

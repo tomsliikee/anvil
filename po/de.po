@@ -2505,6 +2505,9 @@ msgstr "KI: Ollama meldet: {}"
 msgid "AI: inline completion is off. Turn it on in Settings → AI."
 msgstr "KI: Die Inline-Vervollständigung ist aus. Schalten Sie sie unter Einstellungen → KI ein."
 
+msgid "AI: loading the model; the first suggestion takes a while."
+msgstr "KI: Das Modell wird geladen; der erste Vorschlag dauert etwas."
+
 msgid "AI: no suggestion here."
 msgstr "KI: Hier gibt es keinen Vorschlag."
 

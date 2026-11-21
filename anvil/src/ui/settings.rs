@@ -349,10 +349,13 @@ pub fn show(page: Option<&str>) {
     dialog.add(&editor_page());
     let kb = keyboard_page(&dialog);
     dialog.add(&kb);
-    dialog.add(&ai_page());
+    let ai = ai_page();
+    dialog.add(&ai);
     dialog.add(&tools_page());
     if page == Some("keyboard") {
         dialog.set_visible_page(&kb);
+    } else if page == Some("ai") {
+        dialog.set_visible_page(&ai);
     }
     dialog.present(Some(&app.window));
 }

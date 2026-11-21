@@ -1333,6 +1333,10 @@ thread_local! {
     /// The last AI problem shown in the status bar: said once, not on
     /// every typing pause.
     static AI_HINT: RefCell<Option<String>> = const { RefCell::new(None) };
+    /// Models that answered once: their first answer includes loading
+    /// them (13 s for a 1.5b on a laptop CPU), which is no reason to blame
+    /// the model's size.
+    static AI_WARM: RefCell<BTreeSet<String>> = const { RefCell::new(BTreeSet::new()) };
 }
 
 /// Longest wait for one suggestion; loading a 7b model cold takes about
@@ -1446,13 +1450,28 @@ async fn ai_complete(doc: Rc<CodeDoc>, explicit: bool) {
     let handle = crate::runtime::handle().spawn(async move {
         let models = ollama.models().await?;
         let model = anvil_ai::ollama::pick_inline_model(&models, &configured)?;
+        let size = models.iter().find(|m| m.name == model).map_or(0, |m| m.size);
+        let smaller = models.iter().any(|m| m.supports_fim() && m.size < size);
+        // A cold model loads in its own task: typing aborts this one, and
+        // an aborted load would start over on every pause, never finishing.
+        if !ollama.is_loaded(&model).await? {
+            let (o, m) = (ollama.clone(), model.clone());
+            tokio::spawn(async move { o.load(&m, AI_TIMEOUT).await }).await.map_err(|e| anvil_ai::ollama::Error::Server(e.to_string()))??;
+        }
         let started = std::time::Instant::now();
         let raw = ollama.complete(&model, &prefix, &suffix, 48, AI_TIMEOUT).await?;
-        Ok::<_, anvil_ai::ollama::Error>((model, anvil_ai::ollama::clean_completion(&raw, &suffix), started.elapsed()))
+        Ok::<_, anvil_ai::ollama::Error>((model, smaller, anvil_ai::ollama::clean_completion(&raw, &suffix), started.elapsed()))
     });
     let abort = handle.abort_handle();
     let id = abort.id();
     AI_TASK.with(|t| *t.borrow_mut() = Some(abort));
+    // The first suggestion of a session waits for the model to load.
+    glib::timeout_add_local_once(std::time::Duration::from_secs(2), move || {
+        let waiting = AI_TASK.with(|t| t.borrow().as_ref().is_some_and(|h| h.id() == id));
+        if waiting && AI_WARM.with(|w| w.borrow().is_empty()) {
+            hint_once(tr("AI: loading the model; the first suggestion takes a while."));
+        }
+    });
     let result = handle.await;
     AI_TASK.with(|t| {
         let mut t = t.borrow_mut();
@@ -1466,8 +1485,9 @@ async fn ai_complete(doc: Rc<CodeDoc>, explicit: bool) {
         return;
     }
     match result {
-        Ok((model, s, took)) => {
-            if took > AI_SLOW {
+        Ok((model, smaller, s, took)) => {
+            let warm = !AI_WARM.with(|w| w.borrow_mut().insert(model.clone()));
+            if warm && smaller && took > AI_SLOW {
                 hint_once(trf("AI: {} took {} s for a suggestion. A smaller model (Settings → AI) answers faster.", &[&model, &took.as_secs().to_string()]));
             } else {
                 reset_ai_hint();

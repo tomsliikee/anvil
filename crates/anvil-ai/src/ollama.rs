@@ -129,6 +129,26 @@ impl Ollama {
         Ok(tags.models)
     }
 
+    /// Whether `model` is in memory now (`/api/ps`).
+    pub async fn is_loaded(&self, model: &str) -> Result<bool, Error> {
+        #[derive(Deserialize)]
+        struct Ps {
+            models: Vec<Model>,
+        }
+        let r = self.http.get(format!("{}/api/ps", self.base)).timeout(Duration::from_secs(3)).send().await.map_err(unreachable)?;
+        let ps: Ps = r.json().await.map_err(|e| Error::Server(e.to_string()))?;
+        Ok(ps.models.iter().any(|m| m.name == model || m.name.strip_suffix(":latest") == Some(model)))
+    }
+
+    /// Loads `model` without generating. Ollama stops loading when the
+    /// request is dropped, so callers that abort on typing run this apart
+    /// from the request they abort.
+    pub async fn load(&self, model: &str, timeout: Duration) -> Result<(), Error> {
+        let body = json!({ "model": model, "keep_alive": "30m" });
+        let r = self.http.post(format!("{}/api/generate", self.base)).json(&body).timeout(timeout).send().await.map_err(unreachable)?;
+        if r.status().is_success() { Ok(()) } else { Err(server_error(model, &r.text().await.unwrap_or_default())) }
+    }
+
     /// Fill-in-the-middle: the text the model puts between `prefix` and
     /// `suffix`. Short and greedy, as ghost text must be; a blank line
     /// ends it. Dropping the future closes the connection and Ollama stops
@@ -277,6 +297,8 @@ mod tests {
         let o = Ollama::new(DEFAULT_URL).unwrap();
         let models = o.models().await.unwrap();
         let m = pick_inline_model(&models, "").expect("a coder model");
+        o.load(&m, Duration::from_secs(120)).await.unwrap();
+        assert!(o.is_loaded(&m).await.unwrap());
         let out = o.complete(&m, "static int Add(int a, int b)\n{\n    return ", ";\n}\n", 16, Duration::from_secs(120)).await.unwrap();
         assert!(out.contains('a') && out.contains('b'), "{out}");
         let missing = o.complete("no-such-model:1b", "a", "b", 4, Duration::from_secs(10)).await;
