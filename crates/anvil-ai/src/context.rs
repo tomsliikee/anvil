@@ -28,6 +28,13 @@ pub fn fim(text: &str, cursor: usize, signatures: &str, max_chars: usize) -> (St
     (format!("{header}{}", &text[start..cursor]), text[cursor..end].to_owned())
 }
 
+/// Whether ghost text may appear while typing, given the text after the
+/// caret on its line: at the end of a line, or before closing brackets,
+/// quotes and `;` only (`Foo(|)`), never in the middle of code.
+pub fn may_suggest_before(rest_of_line: &str) -> bool {
+    rest_of_line.chars().all(|c| c.is_whitespace() || matches!(c, ')' | ']' | '}' | ';' | ',' | '"' | '\''))
+}
+
 /// One comment line per type with its members' signatures.
 pub fn signatures(files: &[&FileStructure], max_chars: usize) -> String {
     let mut out = String::new();
@@ -76,6 +83,16 @@ mod tests {
         assert!(s.starts_with("|rest"));
         let (p, _) = fim(text, cursor, "// class A: B()", 1000);
         assert!(p.starts_with("// Types in this project:\n// class A: B()\nline1"));
+    }
+
+    #[test]
+    fn suggests_only_at_line_end_or_before_closers() {
+        assert!(may_suggest_before(""));
+        assert!(may_suggest_before("   "));
+        assert!(may_suggest_before(");"));
+        assert!(may_suggest_before("\")"));
+        assert!(!may_suggest_before("x + 1;"));
+        assert!(!may_suggest_before(" // note"));
     }
 
     #[test]
