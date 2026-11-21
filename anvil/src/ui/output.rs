@@ -177,16 +177,6 @@ impl Output {
             self.pane.set_selected(i as u32);
         }
     }
-
-    /// The text of a pane, pending text included (tests, the screenshot run).
-    pub fn text(&self, pane: &str) -> String {
-        let b = &self.buffers[key(pane)];
-        let mut t = b.text(&b.start_iter(), &b.end_iter(), false).to_string();
-        if let Some(p) = self.pending.borrow().get(key(pane)) {
-            t.push_str(p);
-        }
-        t
-    }
 }
 
 /// Underlines the places in the lines from `first` to the end.

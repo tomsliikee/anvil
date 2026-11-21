@@ -728,6 +728,11 @@ impl Debugger {
 
     fn set_starting(&self, on: bool) {
         self.starting.set(on);
+        if on {
+            crate::ui::jobs::start("debug", &tr("Starting the debugger…"));
+        } else {
+            crate::ui::jobs::finish("debug");
+        }
         crate::ui::window::app().toolbar.set_busy(on);
     }
 }

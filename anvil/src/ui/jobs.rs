@@ -99,10 +99,6 @@ pub fn finish(key: &str) {
     }
 }
 
-pub fn is_running(key: &str) -> bool {
-    STATE.with(|s| s.borrow().jobs.iter().any(|j| j.key == key))
-}
-
 impl Job {
     /// Gives the job a cancel button that calls `f` (and then ends the job).
     pub fn cancellable(self, f: impl Fn() + 'static) -> Job {
@@ -316,6 +312,18 @@ pub fn trace(what: &str) {
     if timing() {
         eprintln!("[anvil timing] {:>8.1} ms  {what}", process_start().elapsed().as_secs_f64() * 1000.0);
     }
+}
+
+/// With `ANVIL_TIMING`, notes when `widget` has drawn its first frame.
+pub fn trace_first_frame(widget: &impl gtk::prelude::IsA<gtk::Widget>) {
+    use gtk::prelude::*;
+    if !timing() {
+        return;
+    }
+    widget.add_tick_callback(|_, _| {
+        trace("first frame");
+        glib::ControlFlow::Break
+    });
 }
 
 /// With `ANVIL_TIMING`, reports main-thread stalls over 16 ms: a 4 ms

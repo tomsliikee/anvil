@@ -240,6 +240,7 @@ fn run(tests: Vec<(String, TestId)>, debug: bool, whole: bool) {
     }
     window::show_bottom("tests");
     app.output.clear("Tests");
+    let job = crate::ui::jobs::start("test", &tr("Running tests…"));
     glib::spawn_future_local(async move {
         for (project, ids) in by_project {
             let app = crate::ui::window::app();
@@ -255,6 +256,7 @@ fn run(tests: Vec<(String, TestId)>, debug: bool, whole: bool) {
                 cmd = cmd.env("VSTEST_HOST_DEBUG", "1");
             }
             app.status.set_message(&trf("Running tests of {}…", &[&project]));
+            job.set_text(&trf("Running tests of {}…", &[&project]));
             // Old results of what runs now go, so a failed build never
             // leaves green ticks behind.
             {
@@ -311,6 +313,14 @@ fn run(tests: Vec<(String, TestId)>, debug: bool, whole: bool) {
             }
             app.tests.render();
         }
-        crate::ui::window::app().status.set_message(&tr("Test run finished"));
+        let app = crate::ui::window::app();
+        app.status.set_message(&tr("Test run finished"));
+        let elapsed = anvil_core::build::format_elapsed(job.elapsed());
+        job.finish();
+        let (passed, failed) = {
+            let r = app.tests.results.borrow();
+            (r.values().filter(|r| r.outcome == Outcome::Passed).count(), r.values().filter(|r| r.outcome == Outcome::Failed).count())
+        };
+        crate::ui::jobs::result("test", &format!("{} · {elapsed}", trf("Tests: {} passed, {} failed", &[&passed.to_string(), &failed.to_string()])), crate::ui::jobs::Open::Pane("tests"));
     });
 }

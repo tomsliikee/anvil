@@ -505,6 +505,7 @@ pub fn open_path(path: &Path) {
 }
 
 pub fn open_solution(path: &Path) {
+    crate::ui::jobs::trace("open solution: start");
     let app = crate::ui::window::app();
     if app.solution.borrow().is_some() {
         save_session();
@@ -527,13 +528,16 @@ pub fn open_solution(path: &Path) {
     };
     app.generation.set(app.generation.get() + 1);
     remember_recent(path);
+    crate::ui::jobs::trace("open solution: parsed");
     let session = Session::load(&solution.dir);
     app.window.set_title(Some(&format!("{} - Anvil", solution.name)));
     *app.session.borrow_mut() = session.clone();
     *app.solution.borrow_mut() = Some(solution);
+    crate::ui::jobs::trace("open solution: session loaded");
     app.explorer.reload();
     refresh_startup_dropdown();
     app.debugger.load_breakpoints(&session.breakpoints);
+    crate::ui::jobs::trace("open solution: explorer + breakpoints done");
     app.center.set_visible_child_name("work");
     set_workspace(true);
     for f in &session.open_files {
@@ -544,12 +548,17 @@ pub fn open_solution(path: &Path) {
     if let Some(f) = session.active_file.as_ref().filter(|f| f.exists()) {
         app.tabs.open(f, false);
     }
+    crate::ui::jobs::trace("open solution: open files done");
     app.watcher.watch(solution_dir().as_deref());
     app.lsp.reset_restarts();
     app.lsp.start_for_solution();
+    crate::ui::jobs::trace("open solution: watcher + lsp start done");
     app.git.refresh();
+    crate::ui::jobs::trace("open solution: git done");
     app.tests.discover();
+    crate::ui::jobs::trace("open solution: tests discover done");
     warn_startup_mismatch();
+    crate::ui::jobs::trace("open solution: done (main thread free)");
     // Anvil does not install the SDK; it says so plainly.
     glib::spawn_future_local(async {
         if !crate::host::has("dotnet").await {

@@ -136,6 +136,8 @@ impl Lsp {
         self.sent.borrow_mut().clear();
         self.diags.borrow_mut().clear();
         crate::ui::window::app().status.set_server("");
+        crate::ui::jobs::finish("lsp");
+        crate::ui::jobs::finish("restore");
     }
 
     /// Starts Roslyn for the open solution, downloading it first (with the
@@ -155,6 +157,7 @@ impl Lsp {
         }
         self.starting.set(true);
         app.status.set_server(&tr("Language server starting…"));
+        crate::ui::jobs::start("lsp", &tr("Starting the language server…"));
         glib::spawn_future_local(start());
     }
 
@@ -240,6 +243,7 @@ fn ask_roslyn_consent() {
 fn download_roslyn() {
     let app = crate::ui::window::app();
     app.status.set_server(&tr("Downloading the language server…"));
+    crate::ui::jobs::start("lsp", &tr("Downloading the language server…"));
     let home = host::home();
     glib::spawn_future_local(async move {
         let result = crate::runtime::run(async move {
@@ -261,6 +265,7 @@ fn download_roslyn() {
             Ok(()) => app.lsp.start_for_solution(),
             Err(e) => {
                 app.status.set_server(&tr("Language server not available"));
+                crate::ui::jobs::finish("lsp");
                 app.output.append("Language Server", &format!("{}: {e}\n", tr("Download failed")));
             }
         }
@@ -301,6 +306,7 @@ async fn start() {
         Err(e) => {
             app.lsp.starting.set(false);
             app.status.set_server(&tr("Language server not available"));
+                crate::ui::jobs::finish("lsp");
             app.output.append("Language Server", &format!("{e}\n"));
             return;
         }
@@ -361,6 +367,7 @@ async fn start() {
         }
         Err(e) => {
             app.status.set_server(&tr("Language server not available"));
+                crate::ui::jobs::finish("lsp");
             app.output.append("Language Server", &format!("initialize: {e}\n"));
         }
     }
@@ -373,6 +380,7 @@ fn handle_incoming(msg: Incoming) {
         Incoming::Notification { method, params } => match method.as_str() {
             roslyn::PROJECTS_LOADED => {
                 app.status.set_server(&tr("Ready"));
+                crate::ui::jobs::finish("lsp");
                 for d in app.tabs.code_docs() {
                     schedule_diagnostics(&d.path());
                 }
@@ -424,13 +432,16 @@ fn handle_incoming(msg: Incoming) {
                     glib::spawn_future_local(async move {
                         let app = crate::ui::window::app();
                         app.status.set_server(&tr("Restoring packages…"));
+                        let job = crate::ui::jobs::start("restore", &tr("Restoring packages…"));
                         for p in paths {
                             let cmd = anvil_core::host::Command::dotnet().args(["restore", p.as_str()]);
                             match host::run(cmd, None).await {
-                                Ok(o) => app.output.append("Language Server", &format!("dotnet restore {p}\n{}{}", o.stdout_text(), o.stderr_text())),
-                                Err(e) => app.output.append("Language Server", &format!("dotnet restore {p}: {e}\n")),
+                                Ok(o) if o.ok() => app.output.append("Language Server", &format!("dotnet restore {p}\n{}{}", o.stdout_text(), o.stderr_text())),
+                                Ok(o) => crate::ui::jobs::error("Language Server", &trf("Restore failed for {}", &[&p]), &format!("{}{}", o.stdout_text(), o.stderr_text())),
+                                Err(e) => crate::ui::jobs::error("Language Server", &trf("Restore failed for {}", &[&p]), &e.to_string()),
                             }
                         }
+                        job.finish();
                         app.status.set_server(&tr("Loading projects…"));
                         client.respond(id, Value::Null);
                     });
@@ -451,6 +462,7 @@ fn handle_incoming(msg: Incoming) {
                 app.lsp.start_for_solution();
             } else {
                 app.status.set_server(&tr("Language server stopped"));
+                crate::ui::jobs::finish("lsp");
                 crate::ui::window::toast(&tr("The language server stopped. Tools > Restart Language Server starts it again."));
             }
         }
