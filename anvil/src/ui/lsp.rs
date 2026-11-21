@@ -1258,6 +1258,11 @@ thread_local! {
 }
 
 pub fn completion_visible(_doc: &CodeDoc) -> bool {
+    completion_open()
+}
+
+/// The IntelliSense list is showing (its keys are its own).
+pub fn completion_open() -> bool {
     COMPLETION_OPEN.with(Cell::get)
 }
 

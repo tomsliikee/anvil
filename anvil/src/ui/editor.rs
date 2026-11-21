@@ -192,6 +192,8 @@ pub struct CodeDoc {
     /// An expanded snippet's remaining tab stops (start, end) and where
     /// the caret ends; Tab walks them, Enter or Escape leaves.
     pub snippet: RefCell<Option<SnippetFields>>,
+    /// Gliding scroll and Anvil's own caret.
+    pub smooth: Rc<crate::ui::smooth::Smooth>,
 }
 
 const HIGHLIGHT_TAGS: [(&str, highlight::Kind, &str); 3] = [
@@ -345,7 +347,9 @@ impl CodeDoc {
         it.forward_chars(col.max(0));
         self.buffer.place_cursor(&it);
         let mark = self.buffer.get_insert();
-        self.view.scroll_to_mark(&mark, 0.15, true, 0.0, 0.35);
+        if !self.smooth.scroll_to_iter(&it, 0.35) {
+            self.view.scroll_to_mark(&mark, 0.15, true, 0.0, 0.35);
+        }
         self.view.grab_focus();
     }
 
@@ -1010,6 +1014,7 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
     let scroller = gtk::ScrolledWindow::builder().child(&view).vexpand(true).hexpand(true).build();
     let root = gtk::Overlay::new();
     root.set_child(Some(&scroller));
+    let smooth = crate::ui::smooth::Smooth::attach(&view, &scroller, &root);
     let find = crate::ui::find::FindBar::new(&buffer, view.upcast_ref());
     root.add_overlay(&find.widget);
 
@@ -1029,6 +1034,7 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
         highlight_timer: RefCell::default(),
         bp_marks: RefCell::default(),
         snippet: RefCell::default(),
+        smooth,
     });
     doc.highlight_now();
 

@@ -334,6 +334,16 @@ fn typing_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
         }),
         until(|| TYPING_DONE.with(std::cell::Cell::get), 600_000),
         Step::Shot("typing-after"),
+        // A jump far down: the glide in flight, then where it lands.
+        act(|| {
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                d.goto_line_col(4000, 8);
+            }
+        }),
+        Step::Wait(60),
+        Step::Shot("typing-glide"),
+        Step::Wait(500),
+        Step::Shot("typing-landed"),
         Step::Wait(2000),
         act(|| {
             if let Some(d) = crate::ui::window::app().tabs.current_code() {
