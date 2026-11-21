@@ -13,6 +13,7 @@ use std::time::Duration;
 use adw::prelude::*;
 use anvil_core::host::Command;
 use anvil_core::session::{Breakpoint, HitMode};
+use anvil_core::solution::normalize;
 use anvil_dap::client::{Client, Event, SourceBreakpoint, StackFrame};
 use anvil_dap::display::Snapshot;
 use anvil_dap::launch;
@@ -50,6 +51,8 @@ pub struct Debugger {
     next_id: Cell<u64>,
     /// Between F5 and the attached session (build, hook, attach).
     starting: Cell<bool>,
+    /// Stop (Shift+F5) while starting: the start gives up at its next step.
+    cancel_start: Cell<bool>,
     downloading: Cell<bool>,
     pending_temp: RefCell<Option<(PathBuf, u32)>>,
     break_on_thrown: Cell<bool>,
@@ -92,6 +95,7 @@ impl Debugger {
             session: RefCell::default(),
             next_id: Cell::new(1),
             starting: Cell::new(false),
+            cancel_start: Cell::new(false),
             downloading: Cell::new(false),
             pending_temp: RefCell::default(),
             break_on_thrown: Cell::new(false),
@@ -217,6 +221,7 @@ impl Debugger {
             app.tabs.goto(&b.file, b.line, 1);
         });
         self.refresh_breakpoint_list();
+        self.update_controls();
     }
 
     pub fn is_active(&self) -> bool {
@@ -277,7 +282,8 @@ impl Debugger {
     pub fn load_breakpoints(&self, list: &[Breakpoint]) {
         let mut map: BTreeMap<PathBuf, BTreeMap<u32, Breakpoint>> = BTreeMap::new();
         for b in list {
-            map.entry(b.file.clone()).or_default().insert(b.line, b.clone());
+            let file = normalize(&b.file);
+            map.entry(file.clone()).or_default().insert(b.line, Breakpoint { file, ..b.clone() });
         }
         *self.breakpoints.borrow_mut() = map;
         self.hits.borrow_mut().clear();
@@ -339,6 +345,8 @@ impl Debugger {
     }
 
     pub fn toggle_breakpoint(&self, file: &Path, line: u32) {
+        // netcoredbg binds only the exact path the compiler saw.
+        let file = &normalize(file);
         {
             let mut map = self.breakpoints.borrow_mut();
             let entry = map.entry(file.to_owned()).or_default();
@@ -541,6 +549,10 @@ impl Debugger {
         let cont = self.session.borrow().as_ref().filter(|s| s.stopped).map(|s| (s.client.clone(), s.thread));
         if let Some((c, Some(t))) = cont {
             self.resume();
+            // As VS brings the console to the front: the program may be
+            // waiting for input.
+            window::show_bottom("terminal");
+            crate::ui::window::app().terminal.focus();
             glib::spawn_future_local(async move {
                 let _ = c.continue_(t).await;
             });
@@ -575,6 +587,7 @@ impl Debugger {
             d.set_debug_line(None);
         }
         crate::ui::window::app().status.set_message(&tr("Running"));
+        self.update_controls();
     }
 
     pub fn step(&self, kind: &'static str) {
@@ -606,6 +619,15 @@ impl Debugger {
     }
 
     pub fn stop(&self) {
+        if !self.is_active() && self.starting.get() {
+            let app = crate::ui::window::app();
+            self.cancel_start.set(true);
+            app.builder.cancel();
+            app.terminal.kill();
+            self.set_starting(false);
+            app.status.set_message(&tr("Debugging canceled"));
+            return;
+        }
         let s = self.session.borrow().as_ref().map(|s| (s.client.clone(), s.id));
         if let Some((c, id)) = s {
             glib::spawn_future_local(async move {
@@ -631,7 +653,7 @@ impl Debugger {
     pub fn run_to_cursor(&self) {
         let Some(doc) = crate::ui::window::app().tabs.current_code() else { return };
         let line = doc.buffer.iter_at_mark(&doc.buffer.get_insert()).line() as u32 + 1;
-        let target = (doc.path(), line);
+        let target = (normalize(&doc.path()), line);
         if let Some(s) = self.session.borrow_mut().as_mut() {
             s.temp_line = Some(target.clone());
         } else {
@@ -740,7 +762,7 @@ impl Debugger {
         let id = self.next_session_id();
         glib::spawn_future_local(async move {
             if let Err(e) = attach_adapter(bin, pid, false, id).await {
-                window::show_error(&tr("The debugger could not attach"), &e);
+                fail(&tr("The debugger could not attach"), &e);
                 end_session(id);
             }
         });
@@ -754,7 +776,40 @@ impl Debugger {
 
     fn set_starting(&self, on: bool) {
         self.starting.set(on);
+        if on {
+            self.cancel_start.set(false);
+        }
         crate::ui::window::app().toolbar.set_busy(on);
+        self.update_controls();
+    }
+
+    fn canceled(&self) -> bool {
+        self.cancel_start.get()
+    }
+
+    /// Greys out what cannot run now, as VS does: Continue and the steps
+    /// only while stopped (F10/F11 also start a session), Break All only
+    /// while running, Stop while a session runs or starts.
+    pub fn update_controls(&self) {
+        let app = crate::ui::window::app();
+        let (active, stopped, starting) = (self.is_active(), self.is_stopped(), self.is_starting());
+        let states = [
+            ("debug.start", !starting && (!active || stopped)),
+            ("debug.start-without", !active && !starting),
+            ("debug.break-all", active && !stopped),
+            ("debug.stop", active || starting),
+            ("debug.restart", active),
+            ("debug.step-over", !starting && (!active || stopped)),
+            ("debug.step-into", !starting && (!active || stopped)),
+            ("debug.step-out", stopped),
+            ("debug.run-to-cursor", !starting && (!active || stopped)),
+            ("debug.quick-watch", stopped),
+        ];
+        for (name, on) in states {
+            if let Some(a) = app.window.lookup_action(name).and_downcast::<gio::SimpleAction>() {
+                a.set_enabled(on);
+            }
+        }
     }
 }
 
@@ -877,7 +932,7 @@ fn download_netcoredbg(then_entry: bool) {
             Err(e) => {
                 let _ = std::fs::remove_dir_all(&partial);
                 app.status.set_message("");
-                window::show_error(&tr("netcoredbg could not be downloaded"), &e);
+                fail(&tr("netcoredbg could not be downloaded"), &e);
             }
         }
     });
@@ -915,8 +970,9 @@ fn start_session(bin: PathBuf, entry: bool) {
     };
     app.debugger.set_starting(true);
     crate::ui::build::build_then(crate::ui::build::Target::Project(name.clone()), crate::ui::build::Verb::Build, move |ok| {
-        if !ok {
-            crate::ui::window::app().debugger.set_starting(false);
+        let app = crate::ui::window::app();
+        if !ok || app.debugger.canceled() {
+            app.debugger.set_starting(false);
             return;
         }
         glib::spawn_future_local(async move {
@@ -926,9 +982,13 @@ fn start_session(bin: PathBuf, entry: bool) {
             let app = crate::ui::window::app();
             app.debugger.set_starting(false);
             if let Err(e) = result {
-                app.status.set_message("");
-                window::show_error(&tr("The debugger did not start"), &e);
                 end_session(id);
+                if app.debugger.canceled() {
+                    app.terminal.kill();
+                    app.status.set_message(&tr("Debugging canceled"));
+                } else {
+                    fail(&tr("The debugger did not start"), &e);
+                }
             }
         });
     });
@@ -939,7 +999,7 @@ async fn launch_program(bin: PathBuf, p: anvil_core::solution::Project, entry: b
     let app = crate::ui::window::app();
     let home = host::home();
     let hook = ensure_hook().await?;
-    let dll = crate::ui::build::built_program(&p).await;
+    let dll = crate::ui::build::built_program(&p).await?;
     if !dll.exists() {
         return Err(trf("The built program was not found at {}.", &[&dll.to_string_lossy()]));
     }
@@ -958,13 +1018,16 @@ async fn launch_program(bin: PathBuf, p: anvil_core::solution::Project, entry: b
     // VS runs the program in its output folder.
     let cwd = dll.parent().map(Path::to_path_buf).unwrap_or_else(|| p.dir.clone());
     window::show_bottom("terminal");
-    app.status.set_message(&tr("Starting the program…"));
+    app.status.set_message(&trf("Starting {}…", &[&p.name]));
     app.terminal.run_program_noting_exit(&cwd, &cmd, Some(&exit_file), None);
     // The hook writes the process id, then waits for the debugger.
     let mut waited = Duration::ZERO;
     let pid: u32 = loop {
         if let Some(pid) = std::fs::read_to_string(&pid_file).ok().and_then(|t| t.trim().parse().ok()) {
             break pid;
+        }
+        if app.debugger.canceled() {
+            return Err(tr("Debugging canceled"));
         }
         if exit_file.exists() {
             return Err(tr("The program ended before the debugger could attach. The terminal panel shows its output."));
@@ -976,6 +1039,7 @@ async fn launch_program(bin: PathBuf, p: anvil_core::solution::Project, entry: b
         waited += Duration::from_millis(20);
     };
     let _ = std::fs::remove_file(&pid_file);
+    app.status.set_message(&tr("Attaching the debugger…"));
     attach_adapter(bin, pid, entry, id).await?;
     // The terminal reports the end of the program too (if the debugger
     // went away first).
@@ -1059,6 +1123,7 @@ async fn attach_adapter(bin: PathBuf, pid: u32, entry: bool, id: u64) -> Result<
     app.toolbar.start_label.set_label(&tr("Continue"));
     app.status.set_message(&tr("Running"));
     app.debugger.refresh_breakpoint_list();
+    app.debugger.update_controls();
     glib::spawn_future_local(event_loop(client, rx, id));
     Ok(())
 }
@@ -1128,7 +1193,7 @@ async fn on_stopped(client: &Client, thread: Option<i64>, reason: &str, text: Op
     };
     // The first frame with source is where the user is.
     let top = frames.iter().find(|f| f.source.as_ref().and_then(|s| s.path.as_ref()).is_some()).cloned();
-    let location = top.as_ref().and_then(|f| f.source.as_ref().and_then(|s| s.path.clone()).map(|p| (PathBuf::from(p), f.line as u32)));
+    let location = top.as_ref().and_then(|f| f.source.as_ref().and_then(|s| s.path.clone()).map(|p| (normalize(Path::new(&p)), f.line as u32)));
 
     // The first stop of an F10/F11 start: the entry breakpoints go.
     let entry = app.debugger.session.borrow_mut().as_mut().map(|s| std::mem::replace(&mut s.entry_stop, false)).unwrap_or(false);
@@ -1168,6 +1233,7 @@ async fn on_stopped(client: &Client, thread: Option<i64>, reason: &str, text: Op
     } else {
         return;
     };
+    app.debugger.update_controls();
     if let Some(t) = temp {
         app.debugger.sync_file(&t.0);
     }
@@ -1278,6 +1344,28 @@ fn end_session(id: u64) {
     app.toolbar.debug_controls.set_visible(false);
     window::refresh_startup_dropdown();
     app.status.set_message(&tr("Debugging stopped"));
+    app.debugger.update_controls();
+    // Watch keeps its expressions, without the last session's values.
+    glib::spawn_future_local(refresh_watch());
+}
+
+/// A failed start or download: the reason goes to Output > Debug and the
+/// status bar, a toast offers it, nothing blocks the window.
+fn fail(title: &str, detail: &str) {
+    let app = crate::ui::window::app();
+    app.output.append("Debug", &format!("{title}\n{detail}\n"));
+    // A short reason is the message itself; a long log stays behind Details.
+    let short = detail.trim();
+    let text = if !short.is_empty() && short.len() <= 200 && !short.contains('\n') { short } else { title };
+    app.status.set_message(text);
+    let toast = adw::Toast::new(text);
+    toast.set_button_label(Some(&tr("Details")));
+    toast.set_timeout(8);
+    toast.connect_button_clicked(|_| crate::ui::window::app().output.show("Debug"));
+    app.toast.add_toast(toast);
+    if crate::shots::requested().is_some() {
+        println!("anvil: {title}: {detail}");
+    }
 }
 
 #[cfg(test)]

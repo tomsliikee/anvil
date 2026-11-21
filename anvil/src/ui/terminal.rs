@@ -119,6 +119,11 @@ impl Terminal {
         self.term.feed(text.replace("\r\n", "\n").replace('\n', "\r\n").as_bytes());
     }
 
+    /// Keys go to the program (Continue while debugging).
+    pub fn focus(&self) {
+        self.term.grab_focus();
+    }
+
     /// Types into the running program (the screenshot run).
     pub fn send_input(&self, text: &str) {
         self.term.feed_child(text.as_bytes());

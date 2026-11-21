@@ -632,7 +632,19 @@ pub fn startup_project_name() -> Option<String> {
 pub fn set_startup_project(name: &str) {
     let app = crate::ui::window::app();
     app.session.borrow_mut().startup_project = Some(name.to_owned());
-    app.toolbar.start_label.set_label(name);
+    // The dropdown follows a choice made in the Solution Explorer; while
+    // debugging, Start keeps saying Continue.
+    let index = app.solution.borrow().as_ref().and_then(|s| s.projects.iter().position(|p| p.name == name));
+    if let Some(i) = index
+        && app.toolbar.startup.selected() != i as u32
+    {
+        app.toolbar.filling_startup.set(true);
+        app.toolbar.startup.set_selected(i as u32);
+        app.toolbar.filling_startup.set(false);
+    }
+    if !app.debugger.is_active() {
+        app.toolbar.start_label.set_label(name);
+    }
     save_session();
     app.explorer.reload();
     warn_startup_mismatch();

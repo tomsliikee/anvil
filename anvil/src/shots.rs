@@ -402,11 +402,18 @@ fn debug_repro_steps(sol: PathBuf) -> Vec<Step> {
         Step::Wait(1500),
         log_debugger("starting"),
         Step::Shot("repro-starting"),
+    ];
+    if end == "cancel" {
+        // Shift+F5 while the build or the start runs.
+        steps.extend([command("debug.stop"), Step::Wait(3000), log_debugger("canceled"), Step::Shot("repro-canceled")]);
+        return steps;
+    }
+    steps.extend([
         until(settled, 120_000),
         Step::Wait(1500),
         log_debugger("first stop"),
         Step::Shot("repro-stop1"),
-    ];
+    ]);
     match end.as_str() {
         "stop" | "restart" => {
             steps.extend([

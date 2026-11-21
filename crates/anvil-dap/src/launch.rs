@@ -108,12 +108,6 @@ pub fn output_dll(project_dir: &Path, assembly: &str, tfm: &str) -> PathBuf {
     project_dir.join("bin").join("Debug").join(tfm).join(format!("{assembly}.dll"))
 }
 
-/// The last non-empty line of `dotnet msbuild -getProperty:TargetPath`.
-pub fn parse_target_path(stdout: &str) -> Option<PathBuf> {
-    let line = stdout.lines().map(str::trim).rfind(|l| !l.is_empty())?;
-    line.ends_with(".dll").then(|| PathBuf::from(line))
-}
-
 /// The MSBuild properties F5 asks for in one call.
 pub const PROGRAM_PROPERTIES: [&str; 3] = ["TargetPath", "OutputType", "TargetFrameworks"];
 
@@ -165,13 +159,6 @@ mod tests {
         assert_eq!(attach_args(42)["processId"], 42);
         assert_eq!(adapter_args(), ["--interpreter=vscode"]);
         assert_eq!(output_dll(Path::new("/p"), "App", "net10.0"), Path::new("/p/bin/Debug/net10.0/App.dll"));
-    }
-
-    #[test]
-    fn target_path_from_msbuild() {
-        assert_eq!(parse_target_path("/p/bin/Debug/net10.0/App.dll\n"), Some(PathBuf::from("/p/bin/Debug/net10.0/App.dll")));
-        assert_eq!(parse_target_path("warning: x\n  /p/App.dll  \n\n"), Some(PathBuf::from("/p/App.dll")));
-        assert_eq!(parse_target_path("MSBUILD : error MSB1009\n"), None);
     }
 
     #[test]
