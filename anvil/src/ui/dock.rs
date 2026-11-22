@@ -309,7 +309,7 @@ impl Dock {
         }
     }
 
-    fn rebuild_tabs(self: &Self, area: DockArea) {
+    fn rebuild_tabs(&self, area: DockArea) {
         let a = self.area(area);
         while let Some(c) = a.tabs.first_child() {
             a.tabs.remove(&c);
@@ -556,7 +556,9 @@ fn panel_menu(button: &gtk::ToggleButton, name: &str, area: DockArea) {
     });
     group.add_action(&mv);
     let hide = gio::SimpleAction::new("hide", None);
-    hide.connect_activate(move |_, _| glib::idle_add_local_once(move || crate::ui::window::app().dock.close_area(area)));
+    hide.connect_activate(move |_, _| {
+        glib::idle_add_local_once(move || crate::ui::window::app().dock.close_area(area));
+    });
     group.add_action(&hide);
     button.insert_action_group("panel", Some(&group));
 

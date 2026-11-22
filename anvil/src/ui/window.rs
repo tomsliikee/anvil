@@ -288,9 +288,7 @@ pub fn build(application: &adw::Application) -> Rc<App> {
         }
     });
 
-    window.connect_close_request(glib::clone!(
-        #[upgrade_or]
-        glib::Propagation::Proceed,
+    window.connect_close_request(
         move |w| {
             let s = gio::Settings::new(APP_ID);
             let (width, height) = (w.width(), w.height());
@@ -306,7 +304,7 @@ pub fn build(application: &adw::Application) -> Rc<App> {
             crate::ui::window::app().lsp.stop();
             glib::Propagation::Proceed
         }
-    ));
+    );
     app.center.set_visible_child_name("start");
     if let Some(l) = anvil_core::session::Layout::from_json(&app.settings.string(crate::ui::session::LAYOUT_KEY)) {
         app.dock.apply(&l);

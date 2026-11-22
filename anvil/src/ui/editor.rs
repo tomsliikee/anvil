@@ -1171,12 +1171,10 @@ impl Tabs {
         self.show_second(true);
         let v = AnvilView::new(&c.buffer);
         let src = &c.view;
-        for class in ["editor"] {
-            v.add_css_class(class);
-        }
+        v.add_css_class("editor");
         v.set_monospace(true);
         v.set_show_line_numbers(src.shows_line_numbers());
-        v.set_highlight_current_line(src.highlights_current_line());
+        v.set_highlight_current_line(src.is_highlight_current_line());
         v.set_auto_indent(src.is_auto_indent());
         v.set_indent_on_tab(src.is_indent_on_tab());
         v.set_tab_width(src.tab_width());
