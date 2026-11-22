@@ -138,6 +138,75 @@ pub fn sources(config: &str, inherited: &[(String, String)]) -> Vec<(String, Str
     out
 }
 
+/// A top-level package of `dotnet list <project> package --format json`
+/// (with `--outdated`, `latest` is the newest version on the sources).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ListedPackage {
+    pub id: String,
+    pub requested: String,
+    pub resolved: String,
+    pub latest: Option<String>,
+}
+
+/// Packages (deduplicated over target frameworks) and the problems the SDK
+/// reported, e.g. "No assets file was found … run a NuGet package restore".
+pub fn parse_list(json: &str) -> Result<(Vec<ListedPackage>, Vec<String>), String> {
+    #[derive(Deserialize)]
+    struct Pkg {
+        id: String,
+        #[serde(default, rename = "requestedVersion")]
+        requested: String,
+        #[serde(default, rename = "resolvedVersion")]
+        resolved: String,
+        #[serde(default, rename = "latestVersion")]
+        latest: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct Fw {
+        #[serde(default, rename = "topLevelPackages")]
+        top: Vec<Pkg>,
+    }
+    #[derive(Deserialize)]
+    struct Proj {
+        #[serde(default)]
+        frameworks: Vec<Fw>,
+    }
+    #[derive(Deserialize)]
+    struct Problem {
+        #[serde(default)]
+        text: String,
+    }
+    #[derive(Deserialize)]
+    struct Reply {
+        #[serde(default)]
+        projects: Vec<Proj>,
+        #[serde(default)]
+        problems: Vec<Problem>,
+    }
+    // The SDK may print a line before the JSON; start at the first brace.
+    let start = json.find('{').ok_or_else(|| json.trim().to_owned())?;
+    let r: Reply = serde_json::from_str(&json[start..]).map_err(|e| e.to_string())?;
+    let mut out: Vec<ListedPackage> = Vec::new();
+    for p in r.projects.into_iter().flat_map(|p| p.frameworks).flat_map(|f| f.top) {
+        if out.iter().any(|o| o.id.eq_ignore_ascii_case(&p.id)) {
+            continue;
+        }
+        // "Not found at the sources" is what --outdated says for a
+        // package it cannot look up.
+        let latest = p.latest.filter(|l| !l.is_empty() && !l.contains(' '));
+        out.push(ListedPackage { id: p.id, requested: p.requested, resolved: p.resolved, latest });
+    }
+    Ok((out, r.problems.into_iter().map(|p| p.text).filter(|t| !t.is_empty()).collect()))
+}
+
+/// The `error: …` / `NU1101`-style lines of a failed `dotnet add/remove
+/// package` or restore, for a short message; the whole output goes to the
+/// Output window.
+pub fn error_lines(out: &str) -> String {
+    let errs: Vec<&str> = out.lines().map(str::trim).filter(|l| l.starts_with("error") || l.contains(": error ") || l.contains("error NU")).collect();
+    if errs.is_empty() { out.lines().map(str::trim).filter(|l| !l.is_empty()).last().unwrap_or("").to_owned() } else { errs.join("\n") }
+}
+
 pub fn default_sources() -> Vec<(String, String)> {
     vec![("nuget.org".to_owned(), NUGET_ORG.to_owned())]
 }
@@ -165,6 +234,46 @@ mod tests {
         assert_eq!(parse_versions(r#"{"versions":["1.0.0","1.1.118"]}"#), ["1.1.118", "1.0.0"]);
         assert_eq!(search_url("https://s/q", "style cop", false, 0), "https://s/q?q=style%20cop&skip=0&take=25&prerelease=false&semVerLevel=2.0.0");
         assert_eq!(search_service(r#"{"resources":[{"@id":"https://x/query","@type":"SearchQueryService/3.5.0"}]}"#).as_deref(), Some("https://x/query"));
+    }
+
+    #[test]
+    fn parses_dotnet_list_package_json() {
+        // As `dotnet list Lib.XunitTests package --format json --outdated`
+        // (SDK 10.0.113) printed it, trimmed.
+        let json = r#"{
+  "version": 1,
+  "parameters": "--outdated",
+  "sources": ["https://api.nuget.org/v3/index.json"],
+  "projects": [
+    {
+      "path": "/p/Lib.XunitTests/Lib.XunitTests.csproj",
+      "frameworks": [
+        { "framework": "net10.0", "topLevelPackages": [
+            { "id": "coverlet.collector", "requestedVersion": "6.0.4", "resolvedVersion": "6.0.4", "latestVersion": "10.1.1" },
+            { "id": "xunit.runner.visualstudio", "requestedVersion": "3.1.4", "resolvedVersion": "3.1.4", "latestVersion": "Not found at the sources" } ] },
+        { "framework": "net8.0", "topLevelPackages": [
+            { "id": "coverlet.collector", "requestedVersion": "6.0.4", "resolvedVersion": "6.0.4", "latestVersion": "10.1.1" } ] }
+      ]
+    }
+  ]
+}"#;
+        let (p, problems) = parse_list(json).unwrap();
+        assert_eq!(p.len(), 2);
+        assert_eq!(p[0], ListedPackage { id: "coverlet.collector".into(), requested: "6.0.4".into(), resolved: "6.0.4".into(), latest: Some("10.1.1".into()) });
+        assert_eq!(p[1].latest, None);
+        assert!(problems.is_empty());
+        let (p, _) = parse_list(r#"{"version":1,"parameters":"","projects":[{"path":"/p/Lib.csproj","frameworks":[{"framework":"net10.0"}]}]}"#).unwrap();
+        assert!(p.is_empty());
+        let (_, problems) = parse_list(r#"{"version":1,"problems":[{"project":"/p/A.csproj","level":"error","text":"No assets file was found for `/p/A.csproj`. Please run restore before running this command."}],"projects":[]}"#).unwrap();
+        assert!(problems[0].starts_with("No assets file"));
+        assert!(parse_list("error: not json").is_err());
+    }
+
+    #[test]
+    fn short_error_of_dotnet_add_package() {
+        let out = "  Determining projects to restore...\n  Writing /tmp/x.tmp\ninfo : Adding PackageReference for package 'Nope.Nope' into project '/p/A.csproj'.\nerror: There are no versions available for the package 'Nope.Nope'.\n";
+        assert_eq!(error_lines(out), "error: There are no versions available for the package 'Nope.Nope'.");
+        assert_eq!(error_lines("something went wrong\n"), "something went wrong");
     }
 
     #[test]

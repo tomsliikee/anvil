@@ -98,6 +98,56 @@ pub fn show_head(path: &str) -> Vec<String> {
     vec!["show".into(), format!("HEAD:{path}")]
 }
 
+/// Stage (`cached`) or unstage (`cached` + `reverse`) one hunk, or undo it
+/// in the working tree (`reverse` only); the patch comes on stdin.
+pub fn apply_patch(cached: bool, reverse: bool) -> Vec<String> {
+    let mut a = vec!["apply".to_owned(), "--whitespace=nowarn".to_owned()];
+    if cached {
+        a.push("--cached".into());
+    }
+    if reverse {
+        a.push("--reverse".into());
+    }
+    a.push("-".into());
+    a
+}
+
+/// The last commit's full message (to prefill Amend).
+pub fn last_message() -> Vec<String> {
+    vec!["log".into(), "-1".into(), "--format=%B".into()]
+}
+
+/// Commands that resolve a conflict by taking one side whole (VS: *Take
+/// Current* = ours, *Take Incoming* = theirs). When the chosen side deleted
+/// the file, resolving means removing it.
+pub fn take_side(path: &str, conflict: &str, ours: bool) -> Vec<Vec<String>> {
+    let (us, them) = (conflict.as_bytes().first().copied(), conflict.as_bytes().get(1).copied());
+    let deleted = if ours { us == Some(b'D') } else { them == Some(b'D') };
+    if deleted {
+        return vec![vec!["rm".into(), "--quiet".into(), "--".into(), path.into()]];
+    }
+    vec![vec!["checkout".into(), if ours { "--ours" } else { "--theirs" }.into(), "--".into(), path.into()], stage(&[path])]
+}
+
+pub fn merge_abort() -> Vec<String> {
+    vec!["merge".into(), "--abort".into()]
+}
+
+/// Whether a failed fetch/pull/push wanted credentials it did not get
+/// (no helper, no stored password, or a wrong one).
+pub fn needs_credentials(stderr: &str) -> bool {
+    let s = stderr.to_ascii_lowercase();
+    ["could not read username", "could not read password", "authentication failed", "terminal prompts disabled", "invalid username or password", "http basic: access denied"].iter().any(|m| s.contains(m))
+}
+
+/// `GIT_ASKPASS` program: git calls it with the prompt ("Username for
+/// 'https://…': ") and reads the answer from stdout. It answers from the
+/// file `ANVIL_ASKPASS_FILE` names (user on the first line, password on the
+/// second), which Anvil writes with mode 0600 only after the user typed
+/// them, and fails otherwise, so git reports that it needs credentials. A
+/// successful command hands them to the user's credential helper, if any.
+pub const ASKPASS_SCRIPT: &str = "#!/bin/sh\nf=\"$ANVIL_ASKPASS_FILE\"\n[ -n \"$f\" ] && [ -r \"$f\" ] || exit 1\ncase \"$1\" in\n  Username*) sed -n 1p \"$f\" ;;\n  *) sed -n 2p \"$f\" ;;\nesac\n";
+
 /// VS' `.gitignore` for *Create Git Repository*.
 pub const VS_GITIGNORE: &str = include_str!("../../anvil-core/templates/gitignore.txt");
 
@@ -113,5 +163,16 @@ mod tests {
         assert_eq!(cur.as_deref(), Some("main"));
         assert_eq!(all, ["main", "feature", "origin/main"]);
         assert!(VS_GITIGNORE.contains("[Bb]in/"));
+    }
+
+    #[test]
+    fn conflicts_and_credentials() {
+        assert_eq!(take_side("A.cs", "UU", true), [vec!["checkout", "--ours", "--", "A.cs"], vec!["add", "--", "A.cs"]]);
+        assert_eq!(take_side("A.cs", "UD", false), [vec!["rm", "--quiet", "--", "A.cs"]]);
+        assert_eq!(take_side("A.cs", "UD", true)[0][1], "--ours");
+        assert_eq!(apply_patch(true, true), ["apply", "--whitespace=nowarn", "--cached", "--reverse", "-"]);
+        assert!(needs_credentials("fatal: could not read Username for 'https://example.test': terminal prompts disabled"));
+        assert!(needs_credentials("remote: Invalid username or password.\nfatal: Authentication failed for 'https://x/'"));
+        assert!(!needs_credentials("fatal: 'origin' does not appear to be a git repository"));
     }
 }
