@@ -204,7 +204,7 @@ pub fn parse_list(json: &str) -> Result<(Vec<ListedPackage>, Vec<String>), Strin
 /// Output window.
 pub fn error_lines(out: &str) -> String {
     let errs: Vec<&str> = out.lines().map(str::trim).filter(|l| l.starts_with("error") || l.contains(": error ") || l.contains("error NU")).collect();
-    if errs.is_empty() { out.lines().map(str::trim).filter(|l| !l.is_empty()).last().unwrap_or("").to_owned() } else { errs.join("\n") }
+    if errs.is_empty() { out.lines().map(str::trim).rfind(|l| !l.is_empty()).unwrap_or("").to_owned() } else { errs.join("\n") }
 }
 
 pub fn default_sources() -> Vec<(String, String)> {

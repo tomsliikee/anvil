@@ -170,10 +170,8 @@ pub fn parse_progress(line: &str) -> Option<(Outcome, String, f64)> {
         (Outcome::Passed, r)
     } else if let Some(r) = l.strip_prefix("Failed ") {
         (Outcome::Failed, r)
-    } else if let Some(r) = l.strip_prefix("Skipped ") {
-        (Outcome::Skipped, r)
     } else {
-        return None;
+        (Outcome::Skipped, l.strip_prefix("Skipped ")?)
     };
     let (name, time) = rest.rsplit_once(" [")?;
     let time = time.strip_suffix(']')?;
@@ -183,10 +181,8 @@ pub fn parse_progress(line: &str) -> Option<(Outcome, String, f64)> {
         n.trim().parse().ok()?
     } else if let Some(n) = time.strip_suffix(" s") {
         n.trim().parse::<f64>().ok()? * 1000.0
-    } else if let Some(n) = time.strip_suffix(" m") {
-        n.trim().parse::<f64>().ok()? * 60_000.0
     } else {
-        return None;
+        time.strip_suffix(" m")?.trim().parse::<f64>().ok()? * 60_000.0
     };
     let name = name.split('(').next().unwrap_or(name).trim();
     (!name.is_empty() && !name.contains(' ')).then(|| (outcome, name.to_owned(), ms))
