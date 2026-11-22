@@ -124,7 +124,7 @@ pub fn dispatch(id: &str) {
         "edit.document-outline" => lsp::document_outline(),
 
         // View
-        "view.solution-explorer" => window::show_side("explorer"),
+        "view.solution-explorer" => app.dock.toggle("explorer"),
         "view.git-changes" | "view.git-repository" => {
             window::show_side("git");
             app.git.refresh();
@@ -140,13 +140,13 @@ pub fn dispatch(id: &str) {
                 window::toast(&tr("The AI chat is switched off (Tools → Settings → AI)."));
             }
         }
-        "view.error-list" => window::show_bottom("errors"),
-        "view.output" => window::show_bottom("output"),
+        "view.error-list" => app.dock.toggle("errors"),
+        "view.output" => app.dock.toggle("output"),
         "view.terminal" => {
-            window::show_bottom("terminal");
+            app.dock.toggle("terminal");
             app.terminal.ensure_shell();
         }
-        "view.test-explorer" => window::show_bottom("tests"),
+        "view.test-explorer" => app.dock.toggle("tests"),
         "view.full-screen" => {
             if app.window.is_fullscreen() {
                 app.window.unfullscreen();
@@ -164,21 +164,28 @@ pub fn dispatch(id: &str) {
         // Window
         "window.close-document" => app.tabs.close_current(),
         "window.next-document" | "window.previous-document" => {
-            let n = app.tabs.view.n_pages();
+            let view = app.tabs.active_view();
+            let n = view.n_pages();
             if n > 0
-                && let Some(p) = app.tabs.view.selected_page()
+                && let Some(p) = view.selected_page()
             {
-                let i = app.tabs.view.page_position(&p);
+                let i = view.page_position(&p);
                 let next = if id == "window.next-document" { (i + 1) % n } else { (i + n - 1) % n };
-                app.tabs.view.set_selected_page(&app.tabs.view.nth_page(next));
+                view.set_selected_page(&view.nth_page(next));
             }
         }
         "window.pin-tab" => {
-            if let Some(p) = app.tabs.view.selected_page() {
-                app.tabs.view.set_page_pinned(&p, !p.is_pinned());
+            let view = app.tabs.active_view();
+            if let Some(p) = view.selected_page() {
+                view.set_page_pinned(&p, !p.is_pinned());
             }
         }
-        "window.split" => window::toast(&tr("Split view: drag a tab out to a second window.")),
+        "window.split" => app.tabs.split(),
+        "window.move-to-next-group" => app.tabs.move_to_next_group(),
+        "window.switch-next" => app.switcher.step(true),
+        "window.switch-previous" => app.switcher.step(false),
+        "window.close-tool-window" => app.dock.close_focused(),
+        "window.reset-layout" => app.dock.apply(&anvil_core::session::Layout::default()),
 
         // Build
         "build.solution" => build::build(build::Target::Solution, build::Verb::Build),

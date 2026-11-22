@@ -20,6 +20,7 @@ use gtk::{gio, glib};
 
 use crate::host;
 use crate::i18n::{tr, trf};
+use crate::ui::dock::{Dock, DockArea};
 use crate::ui::editor::{self, CodeDoc};
 use crate::ui::vartree::{self, Item, VarTree};
 use crate::ui::window::{self};
@@ -113,7 +114,7 @@ impl Debugger {
     /// Builds the panel pages. Breakpoints is always there; the others
     /// join the bottom panel while debugging or when opened from the
     /// Debug menu.
-    pub fn add_pages(&self, bottom: &adw::ViewStack) {
+    pub fn add_pages(&self, dock: &Dock) {
         let watch_box = gtk::Box::new(gtk::Orientation::Vertical, 4);
         watch_box.append(&self.watch.widget);
         watch_box.append(&self.watch_entry);
@@ -130,19 +131,20 @@ impl Debugger {
         let bps = gtk::Box::new(gtk::Orientation::Vertical, 0);
         bps.append(&breakpoint_header());
         bps.append(&scrolled(&self.bp_list));
-        bottom.add_titled(&bps, Some("breakpoints"), &tr("Breakpoints"));
+        dock.add(&bps, "breakpoints", &tr("Breakpoints"), DockArea::Bottom);
+        // The session windows dock like any panel but show only while
+        // debugging (or when asked for in Debug → Windows).
+        for (w, name, title) in &pages {
+            dock.add(w, name, title, DockArea::Bottom);
+            dock.set_available(name, false);
+        }
         self.pages.borrow_mut().append(&mut pages);
     }
 
     fn show_pages(&self, on: bool) {
         let app = crate::ui::window::app();
-        for (w, name, title) in self.pages.borrow().iter() {
-            let present = app.bottom.child_by_name(name).is_some();
-            if on && !present {
-                app.bottom.add_titled(w, Some(name), title);
-            } else if !on && present {
-                app.bottom.remove(w);
-            }
+        for (_, name, _) in self.pages.borrow().iter() {
+            app.dock.set_available(name, on);
         }
     }
 
@@ -1176,8 +1178,7 @@ async fn on_stopped(client: &Client, thread: Option<i64>, reason: &str, text: Op
         _ => tr("Paused"),
     };
     app.status.set_message(&msg);
-    let shown = app.bottom.visible_child_name();
-    if !matches!(shown.as_deref(), Some("locals" | "autos" | "watch" | "call-stack" | "immediate")) {
+    if !app.dock.is_showing(&["locals", "autos", "watch", "call-stack", "immediate"]) {
         window::show_bottom("locals");
     }
     app.window.present();

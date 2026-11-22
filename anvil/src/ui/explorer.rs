@@ -522,7 +522,7 @@ pub fn delete_selected() {
         }
         let app = crate::ui::window::app();
         if let Some((page, _)) = app.tabs.find(&d.path) {
-            app.tabs.view.close_page(&page);
+            app.tabs.close_page(&page);
         }
         if let Err(e) = gio::File::for_path(&d.path).trash(gio::Cancellable::NONE) {
             window::show_error(&tr("Delete"), &e.to_string());
