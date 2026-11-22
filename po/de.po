@@ -2459,6 +2459,65 @@ msgstr "Textdatei"
 msgid "editorconfig File (.NET)"
 msgstr "editorconfig-Datei (.NET)"
 
+msgid "Search Solution Explorer"
+msgstr "Projektmappen-Explorer durchsuchen"
+
+msgid "Search Solution Explorer (Ctrl+;)"
+msgstr "Projektmappen-Explorer durchsuchen (Strg+;)"
+
+msgid "Track Active Item"
+msgstr "Aktives Element nachverfolgen"
+
+msgid "No matches"
+msgstr "Keine Treffer"
+
+msgid "'{}' is not a valid name."
+msgstr "„{}“ ist kein gültiger Name."
+
+msgid "Also rename the type '{}' to '{}' and all its references?"
+msgstr "Auch den Typ „{}“ in „{}“ umbenennen, mit allen Verweisen?"
+
+msgid "Rename Type"
+msgstr "Typ umbenennen"
+
+msgid "File Only"
+msgstr "Nur die Datei"
+
+msgid "Some files could not be changed by the type rename."
+msgstr "Einige Dateien konnten beim Umbenennen des Typs nicht geändert werden."
+
+msgid "The language server did not rename the type."
+msgstr "Der Sprachserver hat den Typ nicht umbenannt."
+
+msgid "The type was not renamed: {}"
+msgstr "Der Typ wurde nicht umbenannt: {}"
+
+msgid "Change the namespace to '{}'?"
+msgstr "Namespace in „{}“ ändern?"
+
+msgid "Change the namespaces of {} files to match '{}'?"
+msgstr "Die Namespaces von {} Dateien an „{}“ anpassen?"
+
+msgid "Change Namespace"
+msgstr "Namespace ändern"
+
+msgid "Keep"
+msgstr "Beibehalten"
+
+msgid "No solution is open."
+msgstr "Keine Projektmappe geöffnet."
+
+msgid "{} could not be read: {}"
+msgstr "{} konnte nicht gelesen werden: {}"
+
+msgid "{} could not be moved: {}"
+msgstr "{} konnte nicht verschoben werden: {}"
+
+msgid "{} file kept its namespace (none or several declared, or already right)."
+msgid_plural "{} files kept their namespace (none or several declared, or already right)."
+msgstr[0] "{} Datei behielt ihren Namespace (keiner oder mehrere deklariert, oder schon richtig)."
+msgstr[1] "{} Dateien behielten ihren Namespace (keiner oder mehrere deklariert, oder schon richtig)."
+
 #~ msgid "line"
 #~ msgstr "Zeile"
 

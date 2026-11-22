@@ -126,6 +126,7 @@ pub fn dispatch(id: &str) {
 
         // View
         "view.solution-explorer" => window::show_side("explorer"),
+        "view.explorer-search" => app.explorer.focus_search(),
         "view.git-changes" | "view.git-repository" => {
             window::show_side("git");
             app.git.refresh();

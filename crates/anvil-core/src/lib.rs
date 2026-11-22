@@ -15,6 +15,7 @@ pub mod ignore;
 pub mod keymap;
 pub mod launch;
 pub mod layout;
+pub mod moves;
 pub mod nuget;
 pub mod planner;
 pub mod session;

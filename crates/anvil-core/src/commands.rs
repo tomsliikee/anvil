@@ -86,6 +86,7 @@ pub const COMMANDS: &[CommandDef] = &[
     cmd!("edit.document-outline", "View.DocumentOutline", "Document Outline", ["Ctrl+Alt+T"]),
     // View
     cmd!("view.solution-explorer", "View.SolutionExplorer", "Solution Explorer", ["Ctrl+Alt+L"]),
+    cmd!("view.explorer-search", "SolutionExplorer.Search", "Search Solution Explorer", ["Ctrl+;"]),
     cmd!("view.error-list", "View.ErrorList", "Error List", ["Ctrl+\\, Ctrl+E", "Ctrl+\\, E"]),
     cmd!("view.output", "View.Output", "Output", ["Ctrl+Alt+O"]),
     cmd!("view.terminal", "View.Terminal", "Terminal", ["Ctrl+`"]),
