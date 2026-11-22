@@ -155,13 +155,15 @@ impl Dock {
     /// Debugger windows exist only during a session, the chat only with AI
     /// on: their tabs come and go without losing their place.
     pub fn set_available(&self, name: &str, on: bool) {
-        let area = {
+        // The borrow ends before the page changes: hiding it notifies the
+        // stack, whose handlers read the panels again.
+        let (area, widget) = {
             let mut panels = self.panels.borrow_mut();
             let Some(p) = panels.iter_mut().find(|p| p.name == name) else { return };
             p.available = on;
-            self.area(p.area).stack.page(&p.widget).set_visible(on);
-            p.area
+            (p.area, p.widget.clone())
         };
+        self.area(area).stack.page(&widget).set_visible(on);
         self.rebuild_tabs(area);
         self.refresh(area);
     }
@@ -260,7 +262,9 @@ impl Dock {
 
     /// Moves a panel to another area and shows it there.
     pub fn move_to(&self, name: &str, to: DockArea) {
-        let from = {
+        // Each borrow ends before the stacks change: their handlers read
+        // the panels again.
+        let (from, widget, title, available) = {
             let mut panels = self.panels.borrow_mut();
             let Some(p) = panels.iter_mut().find(|p| p.name == name) else { return };
             if p.area == to {
@@ -269,13 +273,13 @@ impl Dock {
                 return;
             }
             let from = p.area;
-            self.capture_size(from);
-            self.area(from).stack.remove(&p.widget);
-            let page = self.area(to).stack.add_titled(&p.widget, Some(&p.name), &p.title);
-            page.set_visible(p.available);
             p.area = to;
-            from
+            (from, p.widget.clone(), p.title.clone(), p.available)
         };
+        self.capture_size(from);
+        self.area(from).stack.remove(&widget);
+        let page = self.area(to).stack.add_titled(&widget, Some(name), &title);
+        page.set_visible(available);
         self.refresh(from);
         self.show(name);
         self.focus(name);
@@ -412,13 +416,17 @@ impl Dock {
     pub fn apply(&self, layout: &Layout) {
         let names: Vec<(String, DockArea)> = self.panels.borrow().iter().map(|p| (p.name.clone(), layout.area_of(&p.name, p.default))).collect();
         for (name, area) in names {
-            let mut panels = self.panels.borrow_mut();
-            let Some(p) = panels.iter_mut().find(|p| p.name == name) else { continue };
-            if p.area != area {
-                self.area(p.area).stack.remove(&p.widget);
-                let page = self.area(area).stack.add_titled(&p.widget, Some(&p.name), &p.title);
-                page.set_visible(p.available);
+            let moved = {
+                let mut panels = self.panels.borrow_mut();
+                let Some(p) = panels.iter_mut().find(|p| p.name == name) else { continue };
+                let from = p.area;
                 p.area = area;
+                (from != area).then(|| (from, p.widget.clone(), p.title.clone(), p.available))
+            };
+            if let Some((from, widget, title, available)) = moved {
+                self.area(from).stack.remove(&widget);
+                let page = self.area(area).stack.add_titled(&widget, Some(&name), &title);
+                page.set_visible(available);
             }
         }
         for a in &self.areas {
