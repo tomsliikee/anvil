@@ -2433,6 +2433,48 @@ msgstr "Textdatei"
 msgid "editorconfig File (.NET)"
 msgstr "editorconfig-Datei (.NET)"
 
+msgid "Environment"
+msgstr "Umgebung"
+
+msgid "Density"
+msgstr "Dichte"
+
+msgid "Comfortable"
+msgstr "Komfortabel"
+
+msgid "Compact"
+msgstr "Kompakt"
+
+msgid "Drop a panel here"
+msgstr "Fenster hier ablegen"
+
+msgid "Move to Left"
+msgstr "Nach links verschieben"
+
+msgid "Move to Right"
+msgstr "Nach rechts verschieben"
+
+msgid "Move to Bottom"
+msgstr "Nach unten verschieben"
+
+msgid "Active Files"
+msgstr "Aktive Dateien"
+
+msgid "Move to Next Document Group"
+msgstr "In nächste Dokumentgruppe verschieben"
+
+msgid "Switch to Next File"
+msgstr "Zur nächsten Datei wechseln"
+
+msgid "Switch to Previous File"
+msgstr "Zur vorherigen Datei wechseln"
+
+msgid "Hide Panel"
+msgstr "Fenster ausblenden"
+
+msgid "Reset Window Layout"
+msgstr "Fensterlayout zurücksetzen"
+
 #~ msgid "line"
 #~ msgstr "Zeile"
 
