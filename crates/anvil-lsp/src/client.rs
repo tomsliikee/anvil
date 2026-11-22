@@ -63,7 +63,7 @@ pub struct Client {
 impl Client {
     /// Starts reading and writing on the given pipes (on the current Tokio
     /// runtime). Server requests that need no app decision are answered
-    /// here: `workspace/configuration` with nulls (defaults), capability
+    /// here: `workspace/configuration` with Anvil's few settings and nulls (defaults) otherwise, capability
     /// registration and progress creation with success.
     pub fn start<R, W>(reader: R, writer: W) -> (Client, mpsc::UnboundedReceiver<Incoming>)
     where
@@ -94,8 +94,8 @@ impl Client {
                         let params = msg.get("params").cloned().unwrap_or(Value::Null);
                         let auto = match method.as_str() {
                             "workspace/configuration" => {
-                                let n = params.get("items").and_then(Value::as_array).map_or(0, Vec::len);
-                                Some(Value::Array(vec![Value::Null; n]))
+                                let items = params.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
+                                Some(Value::Array(items.iter().map(|i| crate::roslyn::configuration_value(i.get("section").and_then(Value::as_str).unwrap_or(""))).collect()))
                             }
                             "client/registerCapability" | "client/unregisterCapability" | "window/workDoneProgress/create" => Some(Value::Null),
                             _ => None,

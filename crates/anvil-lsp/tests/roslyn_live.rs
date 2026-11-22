@@ -115,15 +115,26 @@ async fn roslyn_ide_features() {
     let typed = ptext.replace("var sb = new StringBuilder();", "var sb = new StringBuild");
     client.notify_raw("textDocument/didChange", json!({"textDocument": {"uri": uri(&program), "version": 2}, "contentChanges": [anvil_lsp::position::change_event(&ptext, &typed)]}));
     let at = pos_of(&typed, "new StringBuild", "new StringBuild".len());
-    let comp = client.request_raw("textDocument/completion", json!({"textDocument": doc, "position": at, "context": {"triggerKind": 1}})).await.expect("completion");
+    // The first list after a change may come before the unimported-type
+    // index is built; VS asks again, so does this test.
+    let mut comp = Value::Null;
+    for _ in 0..5 {
+        comp = client.request_raw("textDocument/completion", json!({"textDocument": doc, "position": at, "context": {"triggerKind": 1}})).await.expect("completion");
+        let labels: Vec<String> = comp["items"].as_array().map(|a| a.iter().take(8).map(|i| i["label"].to_string()).collect()).unwrap_or_default();
+        println!("labels: {labels:?}");
+        if comp["items"].as_array().is_some_and(|a| a.iter().any(|i| i["label"] == "StringBuilder")) { break; }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
     let items = comp["items"].as_array().cloned().or_else(|| comp.as_array().cloned()).unwrap_or_default();
     let sb = items.iter().find(|i| i["label"] == "StringBuilder").cloned();
+    println!("incomplete: {}", comp["isIncomplete"]);
     println!("completion: {} items, StringBuilder: {}", items.len(), sb.as_ref().map(|i| i.to_string()).unwrap_or_default());
-    if let Some(item) = sb {
+    let item = sb.expect("unimported StringBuilder offered");
+    {
         let r = client.request_raw("completionItem/resolve", item).await.expect("resolve item");
         println!("resolved: additionalTextEdits={} textEdit={}", r["additionalTextEdits"], r["textEdit"]);
         let extra: Vec<lsp_types::TextEdit> = serde_json::from_value(r["additionalTextEdits"].clone()).unwrap_or_default();
-        assert!(extra.iter().any(|e| e.new_text.contains("using System.Text;")) || r["command"].is_object(), "auto-using after resolve");
+        assert!(extra.iter().any(|e| e.new_text.contains("using System.Text;")), "auto-using after resolve");
     }
     client.notify_raw("textDocument/didChange", json!({"textDocument": {"uri": uri(&program), "version": 3}, "contentChanges": [anvil_lsp::position::change_event(&typed, &ptext)]}));
 
