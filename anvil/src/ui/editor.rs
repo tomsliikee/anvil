@@ -810,6 +810,12 @@ impl Tabs {
     }
 
     pub fn save_current(&self) {
+        if let Some(d) = self.current()
+            && let Doc::Code(c) = &*d
+            && crate::ui::ide::format_before_save(c)
+        {
+            return;
+        }
         if let Some(d) = self.current() {
             match d.save() {
                 Ok(()) => {
@@ -1103,6 +1109,7 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
     view.connect_line_mark_activated(move |_, it, button, _, _| {
         if button == gdk::BUTTON_PRIMARY
             && let Some(doc) = weak.upgrade()
+            && !crate::ui::ide::lightbulb_clicked(&doc, it.line())
         {
             crate::ui::window::app().debugger.toggle_breakpoint(&doc.path(), it.line() as u32 + 1);
         }
@@ -1152,6 +1159,7 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
         }
     });
     crate::ui::lsp::attach_providers(&doc);
+    crate::ui::ide::attach(&doc);
     crate::ui::lsp::attach_context_menu(&doc);
     Ok(doc)
 }

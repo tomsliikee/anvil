@@ -4,6 +4,7 @@
 
 pub mod client;
 pub mod completion;
+pub mod navigation;
 pub mod position;
 pub mod roslyn;
 pub mod rpc;

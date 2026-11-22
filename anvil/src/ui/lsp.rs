@@ -283,7 +283,12 @@ async fn start() {
     let dir = roslyn::install_dir(&home, roslyn::VERSION);
     let logs = crate::config_dir().join("logs");
     let _ = std::fs::create_dir_all(&logs);
-    let cmd = anvil_core::host::Command::dotnet().args(roslyn::args(&dir, &logs)).cwd(&sol.dir);
+    let mut cmd = anvil_core::host::Command::dotnet().args(roslyn::args(&dir, &logs)).cwd(&sol.dir);
+    // Metadata as source lands in a folder the Flatpak can read.
+    let _ = std::fs::create_dir_all(roslyn::temp_dir(&home));
+    for (k, v) in roslyn::env(&home) {
+        cmd = cmd.env(k, v);
+    }
     let (kill_tx, kill_rx) = tokio::sync::oneshot::channel::<()>();
     let started = crate::runtime::run(async move {
         let mut c = host::tokio_command(&cmd);
@@ -510,6 +515,7 @@ fn apply_squiggles(doc: &CodeDoc) {
         doc.buffer.apply_tag_by_name(tag, &at(a), &at(b));
     }
     *doc.diagnostics.borrow_mut() = all;
+    crate::ui::ide::update_lightbulb(doc);
 }
 
 thread_local! {
@@ -664,107 +670,6 @@ fn need_server() -> Option<(Client, Rc<CodeDoc>)> {
     }
 }
 
-fn locations(v: Value) -> Vec<lt::Location> {
-    if v.is_null() {
-        return Vec::new();
-    }
-    if let Ok(one) = serde_json::from_value::<lt::Location>(v.clone()) {
-        return vec![one];
-    }
-    if let Ok(many) = serde_json::from_value::<Vec<lt::Location>>(v.clone()) {
-        return many;
-    }
-    serde_json::from_value::<Vec<lt::LocationLink>>(v)
-        .map(|links| links.into_iter().map(|l| lt::Location { uri: l.target_uri, range: l.target_selection_range }).collect())
-        .unwrap_or_default()
-}
-
-fn goto_location(l: &lt::Location) {
-    if let Some(p) = roslyn::path_from_uri(l.uri.as_str()) {
-        crate::ui::window::app().tabs.goto(&p, l.range.start.line + 1, l.range.start.character + 1);
-    }
-}
-
-fn hits(locs: &[lt::Location]) -> Vec<crate::ui::find::Hit> {
-    locs.iter()
-        .filter_map(|l| {
-            let p = roslyn::path_from_uri(l.uri.as_str())?;
-            let text = crate::ui::window::app().tabs.code_doc(&p).map(|d| d.text()).or_else(|| anvil_core::text::TextFile::read(&p).ok().map(|f| f.text)).unwrap_or_default();
-            let line = text.lines().nth(l.range.start.line as usize).unwrap_or("").to_owned();
-            Some(crate::ui::find::Hit { path: p, line: l.range.start.line + 1, col: l.range.start.character + 1, text: line })
-        })
-        .collect()
-}
-
-/// F12, Ctrl+F12 (`textDocument/definition`, `…/implementation`).
-pub fn goto(method: &'static str) {
-    let Some((client, doc)) = need_server() else { return };
-    let params = position_params(&doc);
-    glib::spawn_future_local(async move {
-        match client.request_raw(method, params).await.map(locations) {
-            Ok(l) if l.len() == 1 => goto_location(&l[0]),
-            Ok(l) if !l.is_empty() => crate::ui::window::app().find_results.show(&tr("Go To Implementation"), &hits(&l)),
-            Ok(_) => crate::ui::window::app().status.flash(&tr("Cannot navigate to the symbol under the caret.")),
-            Err(e) => crate::ui::window::app().status.flash(&e.to_string()),
-        }
-    });
-}
-
-/// Shift+F12.
-pub fn find_references() {
-    let Some((client, doc)) = need_server() else { return };
-    let mut params = position_params(&doc);
-    params["context"] = json!({"includeDeclaration": true});
-    glib::spawn_future_local(async move {
-        if let Ok(v) = client.request_raw("textDocument/references", params).await {
-            let l = locations(v);
-            crate::ui::window::app().find_results.show(&tr("Find All References"), &hits(&l));
-        }
-    });
-}
-
-/// Alt+F12: the definition in a read-only view under the caret.
-pub fn peek_definition() {
-    let Some((client, doc)) = need_server() else { return };
-    let params = position_params(&doc);
-    glib::spawn_future_local(async move {
-        let Ok(v) = client.request_raw("textDocument/definition", params).await else { return };
-        let Some(l) = locations(v).into_iter().next() else { return };
-        let Some(path) = roslyn::path_from_uri(l.uri.as_str()) else { return };
-        let text = crate::ui::window::app().tabs.code_doc(&path).map(|d| d.text()).or_else(|| anvil_core::text::TextFile::read(&path).ok().map(|f| f.text)).unwrap_or_default();
-        let buffer = sourceview5::Buffer::new(None);
-        buffer.set_language(sourceview5::LanguageManager::default().language("anvil-csharp").as_ref());
-        buffer.set_style_scheme(sourceview5::StyleSchemeManager::default().scheme(if adw::StyleManager::default().is_dark() { "anvil-dark" } else { "anvil-light" }).as_ref());
-        buffer.set_text(&text);
-        let view = sourceview5::View::with_buffer(&buffer);
-        view.set_editable(false);
-        view.set_monospace(true);
-        view.set_show_line_numbers(true);
-        view.add_css_class("editor");
-        let scroller = gtk::ScrolledWindow::builder().child(&view).min_content_height(260).min_content_width(640).build();
-        let title = gtk::Label::builder().label(path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).xalign(0.0).css_classes(["panel-title"]).build();
-        let b = gtk::Box::new(gtk::Orientation::Vertical, 6);
-        b.append(&title);
-        b.append(&scroller);
-        let pop = gtk::Popover::new();
-        pop.set_child(Some(&b));
-        pop.set_parent(&doc.view);
-        let rect = doc.view.iter_location(&doc.buffer.iter_at_mark(&doc.buffer.get_insert()));
-        let (x, y) = doc.view.buffer_to_window_coords(gtk::TextWindowType::Widget, rect.x(), rect.y() + rect.height());
-        pop.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x, y, 1, 1)));
-        pop.set_position(gtk::PositionType::Bottom);
-        pop.popup();
-        if let Some(mut it) = buffer.iter_at_line(l.range.start.line as i32) {
-            it.forward_chars(l.range.start.character as i32);
-            buffer.place_cursor(&it);
-            glib::idle_add_local_once(move || {
-                view.scroll_to_mark(&buffer.get_insert(), 0.0, true, 0.0, 0.3);
-            });
-        }
-        pop.connect_closed(|p| p.unparent());
-    });
-}
-
 /// Ctrl+R, Ctrl+R / F2.
 pub fn rename() {
     let Some((client, doc)) = need_server() else { return };
@@ -803,66 +708,6 @@ fn word_at_cursor(doc: &CodeDoc) -> String {
     let start = text[..at].rfind(|c: char| !is_word(c)).map_or(0, |i| i + 1);
     let end = text[at..].find(|c: char| !is_word(c)).map_or(text.len(), |i| at + i);
     text[start..end].to_owned()
-}
-
-/// Ctrl+. : code actions at the caret (with the diagnostics there), as a
-/// list under the caret; the chosen one is resolved and applied.
-pub fn quick_actions() {
-    let Some((client, doc)) = need_server() else { return };
-    let text = doc.text();
-    let at = doc.cursor_byte();
-    let (start, end) = doc.buffer.selection_bounds().map(|(a, b)| (text[..].char_indices().nth(a.offset() as usize).map_or(text.len(), |(i, _)| i), text.char_indices().nth(b.offset() as usize).map_or(text.len(), |(i, _)| i))).unwrap_or((at, at));
-    let range = lt::Range { start: to_position(&text, start), end: to_position(&text, end) };
-    let line = range.start.line;
-    let diags: Vec<lt::Diagnostic> = doc.diagnostics.borrow().iter().filter(|d| d.range.start.line <= line && d.range.end.line >= line).cloned().collect();
-    let params = json!({"textDocument": {"uri": uri_string(&doc.path())}, "range": range, "context": {"diagnostics": diags}});
-    glib::spawn_future_local(async move {
-        let Ok(v) = client.request_raw("textDocument/codeAction", params).await else { return };
-        let actions: Vec<Value> = v.as_array().cloned().unwrap_or_default();
-        if actions.is_empty() {
-            crate::ui::window::app().status.flash(&tr("No quick actions here."));
-            return;
-        }
-        let items: Vec<(String, Value)> = actions.into_iter().map(|a| (a.get("title").and_then(Value::as_str).unwrap_or("?").to_owned(), a)).collect();
-        let doc2 = doc.clone();
-        crate::ui::menus::choose_at_caret(&doc2, &items.iter().map(|(t, _)| t.clone()).collect::<Vec<_>>(), move |i| {
-            let (_, action) = items[i].clone();
-            let client = client.clone();
-            glib::spawn_future_local(async move {
-                let action = if action.get("edit").is_none() && action.get("data").is_some() { client.request_raw("codeAction/resolve", action.clone()).await.unwrap_or(action) } else { action };
-                if let Some(edit) = action.get("edit").and_then(|e| serde_json::from_value::<lt::WorkspaceEdit>(e.clone()).ok()) {
-                    apply_workspace_edit(&edit);
-                }
-                if let Some(cmd) = action.get("command") {
-                    let _ = client.request_raw("workspace/executeCommand", json!({"command": cmd.get("command"), "arguments": cmd.get("arguments")})).await;
-                }
-            });
-        });
-    });
-}
-
-/// Ctrl+K, Ctrl+D and Ctrl+K, Ctrl+F.
-pub fn format(selection_only: bool) {
-    let Some((client, doc)) = need_server() else { return };
-    let text = doc.text();
-    let version = doc.version.get();
-    let opts = json!({"tabSize": 4, "insertSpaces": doc.view.is_insert_spaces_instead_of_tabs()});
-    let (method, params) = match doc.buffer.selection_bounds().filter(|_| selection_only) {
-        Some((a, b)) => {
-            let sa = text.char_indices().nth(a.offset() as usize).map_or(text.len(), |(i, _)| i);
-            let sb = text.char_indices().nth(b.offset() as usize).map_or(text.len(), |(i, _)| i);
-            ("textDocument/rangeFormatting", json!({"textDocument": {"uri": uri_string(&doc.path())}, "range": {"start": to_position(&text, sa), "end": to_position(&text, sb)}, "options": opts}))
-        }
-        None => ("textDocument/formatting", json!({"textDocument": {"uri": uri_string(&doc.path())}, "options": opts})),
-    };
-    glib::spawn_future_local(async move {
-        let Ok(v) = client.request_raw(method, params).await else { return };
-        if doc.version.get() != version {
-            return;
-        }
-        let edits: Vec<lt::TextEdit> = serde_json::from_value(v).unwrap_or_default();
-        doc.apply_edits(&to_core_edits(&text, &edits));
-    });
 }
 
 /// Ctrl+K, Ctrl+I and the hover provider share this.
@@ -1163,10 +1008,7 @@ mod provider {
                 buffer.place_cursor(&it);
             }
             buffer.end_user_action();
-            if let Some(extra) = item.additional_text_edits.filter(|v| !v.is_empty()) {
-                let text = doc.text();
-                doc.apply_edits(&to_core_edits(&text, &extra));
-            }
+            crate::ui::ide::additional_edits(&doc, item);
         }
     }
 }

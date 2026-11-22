@@ -51,6 +51,31 @@ pub fn args(dir: &Path, log_dir: &Path) -> Vec<String> {
     ]
 }
 
+/// Where the server writes its temporary files, above all the
+/// decompiled "metadata as source" files of Go To Definition on a library
+/// type. Roslyn runs on the host; the Flatpak has its own `/tmp` but
+/// shares the home, so the folder is under the home.
+pub fn temp_dir(home: &Path) -> PathBuf {
+    home.join(".cache/anvil/roslyn-tmp")
+}
+
+/// The server's environment beyond `dotnet`'s: `TMPDIR` (see [`temp_dir`]).
+pub fn env(home: &Path) -> Vec<(String, String)> {
+    vec![("TMPDIR".into(), temp_dir(home).to_string_lossy().into_owned())]
+}
+
+/// Text of a source-generated document (`roslyn-source-generated://`
+/// URIs from Go To Definition): `{"textDocument": {"uri"}}` → `{"text"}`.
+pub const SOURCE_GENERATED_TEXT: &str = "sourceGeneratedDocument/_roslyn_getText";
+
+/// Anvil's answer to one `workspace/configuration` item; `null` keeps
+/// the server's default. Types from namespaces without a `using` are
+/// offered in completion (VS' "Show items from unimported namespaces"),
+/// so committing one adds the `using`.
+pub fn configuration_value(section: &str) -> Value {
+    if section.ends_with("dotnet_show_completion_items_from_unimported_namespaces") { json!(true) } else { Value::Null }
+}
+
 /// Roslyn does not load anything by itself: after `initialized` the client
 /// names the solution (`solution/open`) or the projects (`project/open`).
 pub fn open_solution_params(solution: &Path) -> Value {

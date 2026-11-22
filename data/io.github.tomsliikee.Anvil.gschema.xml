@@ -26,6 +26,7 @@
     <key name="new-solution-format" enum="io.github.tomsliikee.Anvil.SolutionFormat"><default>"slnx"</default><summary>Format of new solutions</summary></key>
     <key name="word-wrap" type="b"><default>false</default><summary>Wrap long lines</summary></key>
     <key name="smooth-motion" type="b"><default>true</default><summary>Smooth scrolling and an animated caret in the editor</summary></key>
+    <key name="format-on-save" type="b"><default>false</default><summary>Format C# documents through the language server when saving</summary></key>
     <key name="show-whitespace" type="b"><default>false</default><summary>Show spaces and tabs</summary></key>
     <key name="codelens" type="b"><default>false</default><summary>Show reference counts above members</summary></key>
     <key name="blame" type="b"><default>false</default><summary>Show git blame in the gutter</summary></key>

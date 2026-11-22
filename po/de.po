@@ -2540,6 +2540,60 @@ msgid_plural "{} files kept their namespace (none or several declared, or alread
 msgstr[0] "{} Datei behielt ihren Namespace (keiner oder mehrere deklariert, oder schon richtig)."
 msgstr[1] "{} Dateien behielten ihren Namespace (keiner oder mehrere deklariert, oder schon richtig)."
 
+msgid "Only C# files have language features."
+msgstr "Nur C#-Dateien haben Sprachfunktionen."
+
+msgid "The language server did not answer in time; it may still be loading the projects."
+msgstr "Der Sprachserver hat nicht rechtzeitig geantwortet; vielleicht lädt er noch die Projekte."
+
+msgid "Language server: {}"
+msgstr "Sprachserver: {}"
+
+msgid "Finding implementations…"
+msgstr "Implementierungen werden gesucht…"
+
+msgid "Finding the definition…"
+msgstr "Definition wird gesucht…"
+
+msgid "The definition is not available as source."
+msgstr "Die Definition ist nicht als Quelltext verfügbar."
+
+msgid "{} cannot be read."
+msgstr "{} kann nicht gelesen werden."
+
+msgid "Metadata as source: decompiled, read-only."
+msgstr "Metadaten als Quelltext: dekompiliert, schreibgeschützt."
+
+msgid "Finding references…"
+msgstr "Verweise werden gesucht…"
+
+msgid "No references found."
+msgstr "Keine Verweise gefunden."
+
+msgid "{} references in {} files"
+msgstr "{} Verweise in {} Dateien"
+
+msgid "Finding quick actions…"
+msgstr "Schnellaktionen werden gesucht…"
+
+msgid "Loading preview…"
+msgstr "Vorschau wird geladen…"
+
+msgid "The change could not be applied to every file."
+msgstr "Die Änderung konnte nicht auf alle Dateien angewendet werden."
+
+msgid "This action has no change Anvil can apply."
+msgstr "Diese Aktion enthält keine Änderung, die Anvil anwenden kann."
+
+msgid "No preview: this action runs a command."
+msgstr "Keine Vorschau: Diese Aktion führt einen Befehl aus."
+
+msgid "No preview available."
+msgstr "Keine Vorschau verfügbar."
+
+msgid "Format document on save"
+msgstr "Dokument beim Speichern formatieren"
+
 #~ msgid "line"
 #~ msgstr "Zeile"
 

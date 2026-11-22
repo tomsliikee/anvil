@@ -268,6 +268,7 @@ pub fn build(application: &adw::Application) -> Rc<App> {
     bottom.add_titled(&terminal.widget, Some("terminal"), &tr("Terminal"));
     bottom.add_titled(&tests.widget, Some("tests"), &tr("Test Explorer"));
     bottom.add_titled(&find_results.widget, Some("find"), &tr("Find Results"));
+    bottom.add_titled(&crate::ui::ide::references_widget(), Some("references"), &tr("Find All References"));
     debugger.add_pages(&bottom);
     let bottom_panel = tabbed_panel(&bottom, None);
 

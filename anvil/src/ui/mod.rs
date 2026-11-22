@@ -12,6 +12,7 @@ pub mod explorer;
 pub mod find;
 pub mod git;
 pub mod jobs;
+pub mod ide;
 pub mod lsp;
 pub mod menus;
 pub mod newitem;

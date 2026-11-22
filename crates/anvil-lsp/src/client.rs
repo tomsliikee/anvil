@@ -21,6 +21,8 @@ pub enum Error {
     Closed,
     /// The answer did not have the expected shape.
     Decode(String),
+    /// No answer in time; the request was cancelled.
+    Timeout,
 }
 
 impl std::fmt::Display for Error {
@@ -29,6 +31,7 @@ impl std::fmt::Display for Error {
             Error::Rpc { code, message } => write!(f, "{message} ({code})"),
             Error::Closed => f.write_str("the language server stopped"),
             Error::Decode(e) => write!(f, "unexpected reply: {e}"),
+            Error::Timeout => f.write_str("the language server did not answer in time"),
         }
     }
 }
@@ -60,7 +63,7 @@ pub struct Client {
 impl Client {
     /// Starts reading and writing on the given pipes (on the current Tokio
     /// runtime). Server requests that need no app decision are answered
-    /// here: `workspace/configuration` with nulls (defaults), capability
+    /// here: `workspace/configuration` with Anvil's few settings and nulls (defaults) otherwise, capability
     /// registration and progress creation with success.
     pub fn start<R, W>(reader: R, writer: W) -> (Client, mpsc::UnboundedReceiver<Incoming>)
     where
@@ -91,8 +94,8 @@ impl Client {
                         let params = msg.get("params").cloned().unwrap_or(Value::Null);
                         let auto = match method.as_str() {
                             "workspace/configuration" => {
-                                let n = params.get("items").and_then(Value::as_array).map_or(0, Vec::len);
-                                Some(Value::Array(vec![Value::Null; n]))
+                                let items = params.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
+                                Some(Value::Array(items.iter().map(|i| crate::roslyn::configuration_value(i.get("section").and_then(Value::as_str).unwrap_or(""))).collect()))
                             }
                             "client/registerCapability" | "client/unregisterCapability" | "window/workDoneProgress/create" => Some(Value::Null),
                             _ => None,
@@ -154,6 +157,13 @@ impl Client {
     pub async fn request_raw(&self, method: &str, params: Value) -> Result<Value, Error> {
         let (_, rx) = self.send_request(method, params);
         rx.await.unwrap_or(Err(Error::Closed))
+    }
+
+    /// Gives up on a request the caller stopped waiting for (a timeout):
+    /// its pending slot is freed and the server gets `$/cancelRequest`.
+    pub fn abandon(&self, id: i64) {
+        self.pending.lock().expect("pending lock").remove(&id);
+        self.cancel(id);
     }
 
     /// A typed request.

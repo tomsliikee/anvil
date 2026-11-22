@@ -8,7 +8,7 @@ use sourceview5::prelude::*;
 use crate::i18n::tr;
 use crate::ui::editor::Doc;
 use crate::ui::window::{self};
-use crate::ui::{build, designer, dialogs, editor, explorer, find, lsp, newitem, nuget, properties, settings};
+use crate::ui::{build, designer, dialogs, editor, explorer, find, ide, lsp, newitem, nuget, properties, settings};
 
 fn code() -> Option<std::rc::Rc<editor::CodeDoc>> {
     crate::ui::window::app().tabs.current_code()
@@ -77,8 +77,8 @@ pub fn dispatch(id: &str) {
         "edit.comment" => with_code(|d| d.comment(Some(true))),
         "edit.uncomment" => with_code(|d| d.comment(Some(false))),
         "edit.toggle-comment" => with_code(|d| d.comment(None)),
-        "edit.format-document" => lsp::format(false),
-        "edit.format-selection" => lsp::format(true),
+        "edit.format-document" => ide::format(false),
+        "edit.format-selection" => ide::format(true),
         "edit.move-line-up" => with_code(|d| d.view.emit_move_lines(false)),
         "edit.move-line-down" => with_code(|d| d.view.emit_move_lines(true)),
         "edit.duplicate" => with_code(|d| d.duplicate()),
@@ -105,7 +105,7 @@ pub fn dispatch(id: &str) {
         "edit.parameter-info" => lsp::signature_help(),
         "edit.ai-suggest" => lsp::request_ai(),
         "edit.quick-info" => lsp::quick_info(),
-        "edit.quick-actions" => lsp::quick_actions(),
+        "edit.quick-actions" => ide::quick_actions(),
         "edit.rename" => {
             if let Some(Doc::Diagram(d)) = app.tabs.current().as_deref() {
                 d.rename_selected();
@@ -113,10 +113,10 @@ pub fn dispatch(id: &str) {
                 lsp::rename();
             }
         }
-        "edit.goto-definition" => lsp::goto("textDocument/definition"),
-        "edit.peek-definition" => lsp::peek_definition(),
-        "edit.goto-implementation" => lsp::goto("textDocument/implementation"),
-        "edit.find-references" => lsp::find_references(),
+        "edit.goto-definition" => ide::goto(false),
+        "edit.peek-definition" => ide::peek_definition(),
+        "edit.goto-implementation" => ide::goto(true),
+        "edit.find-references" => ide::find_references(),
         "edit.insert-snippet" => dialogs::insert_snippet(false),
         "edit.surround-with" => dialogs::insert_snippet(true),
         "edit.navigate-back" => app.tabs.navigate(true),
