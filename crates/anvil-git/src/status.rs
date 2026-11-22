@@ -46,6 +46,9 @@ pub struct Entry {
     pub orig_path: Option<String>,
     pub staged: Change,
     pub unstaged: Change,
+    /// For an unmerged path, git's two letters: `UU` both modified, `AA` both
+    /// added, `DU` deleted by us, `UD` deleted by them, `AU`, `UA`, `DD`.
+    pub conflict: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -59,16 +62,23 @@ pub struct Status {
 
 impl Status {
     pub fn staged(&self) -> impl Iterator<Item = &Entry> {
-        self.entries.iter().filter(|e| e.staged != Change::Unmodified)
+        self.entries.iter().filter(|e| e.staged != Change::Unmodified && e.conflict.is_none())
     }
 
     pub fn unstaged(&self) -> impl Iterator<Item = &Entry> {
-        self.entries.iter().filter(|e| e.unstaged != Change::Unmodified)
+        self.entries.iter().filter(|e| e.unstaged != Change::Unmodified && e.conflict.is_none())
+    }
+
+    /// Merge Conflicts: unmerged paths after a merge, pull, rebase or stash.
+    pub fn conflicts(&self) -> impl Iterator<Item = &Entry> {
+        self.entries.iter().filter(|e| e.conflict.is_some())
     }
 }
 
+/// `--no-optional-locks`: status would otherwise refresh `.git/index`,
+/// which the panel watches, and refresh itself forever.
 pub fn args() -> Vec<String> {
-    ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"].map(String::from).to_vec()
+    ["--no-optional-locks", "status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"].map(String::from).to_vec()
 }
 
 pub fn parse(out: &[u8]) -> Status {
@@ -102,7 +112,7 @@ pub fn parse(out: &[u8]) -> Status {
             let f: Vec<&str> = rest.splitn(8, ' ').collect();
             if f.len() == 8 {
                 let (x, y) = xy(f[0]);
-                s.entries.push(Entry { path: f[7].to_owned(), orig_path: None, staged: x, unstaged: y });
+                s.entries.push(Entry { path: f[7].to_owned(), orig_path: None, staged: x, unstaged: y, conflict: None });
             }
         } else if let Some(rest) = r.strip_prefix("2 ") {
             let f: Vec<&str> = rest.splitn(9, ' ').collect();
@@ -110,15 +120,15 @@ pub fn parse(out: &[u8]) -> Status {
                 let (x, y) = xy(f[0]);
                 let orig = records.get(i).map(|o| String::from_utf8_lossy(o).into_owned());
                 i += 1;
-                s.entries.push(Entry { path: f[8].to_owned(), orig_path: orig, staged: x, unstaged: y });
+                s.entries.push(Entry { path: f[8].to_owned(), orig_path: orig, staged: x, unstaged: y, conflict: None });
             }
         } else if let Some(rest) = r.strip_prefix("u ") {
             let f: Vec<&str> = rest.splitn(10, ' ').collect();
             if let Some(p) = f.last() {
-                s.entries.push(Entry { path: (*p).to_owned(), orig_path: None, staged: Change::Unmerged, unstaged: Change::Unmerged });
+                s.entries.push(Entry { path: (*p).to_owned(), orig_path: None, staged: Change::Unmerged, unstaged: Change::Unmerged, conflict: f.first().map(|x| (*x).to_owned()) });
             }
         } else if let Some(p) = r.strip_prefix("? ") {
-            s.entries.push(Entry { path: p.to_owned(), orig_path: None, staged: Change::Unmodified, unstaged: Change::Untracked });
+            s.entries.push(Entry { path: p.to_owned(), orig_path: None, staged: Change::Unmodified, unstaged: Change::Untracked, conflict: None });
         }
     }
     s
@@ -143,5 +153,17 @@ mod tests {
         assert_eq!(s.entries[3].unstaged, Change::Untracked);
         assert_eq!(s.staged().count(), 2);
         assert_eq!(s.unstaged().count(), 2);
+    }
+
+    #[test]
+    fn unmerged_paths_are_conflicts_only() {
+        // From a real `git merge` with both sides changing A.cs and one
+        // side deleting B.cs.
+        let records = ["# branch.head main", "u UU N... 100644 100644 100644 100644 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 3333333333333333333333333333333333333333 Lib/A b.cs", "u UD N... 100644 100644 000000 100644 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 0000000000000000000000000000000000000000 B.cs", "1 M. N... 100644 100644 100644 a b C.cs", ""];
+        let s = parse(records.join("\0").as_bytes());
+        let c: Vec<(&str, &str)> = s.conflicts().map(|e| (e.path.as_str(), e.conflict.as_deref().unwrap())).collect();
+        assert_eq!(c, [("Lib/A b.cs", "UU"), ("B.cs", "UD")]);
+        assert_eq!(s.staged().map(|e| e.path.as_str()).collect::<Vec<_>>(), ["C.cs"]);
+        assert_eq!(s.unstaged().count(), 0);
     }
 }
