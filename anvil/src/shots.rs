@@ -95,6 +95,15 @@ pub fn run(dir: PathBuf) {
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
+    // ANVIL_SHOTS=keys: Feature Search, the dialogs and the find bar with
+    // keyboard focus shown, for the keyboard and consistency audit.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("keys")
+        && let Ok(open) = std::env::var("ANVIL_OPEN")
+    {
+        steps.extend(keys_steps(PathBuf::from(open)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
     // ANVIL_SHOTS=debug: F5 for real with netcoredbg on a sample console
     // app (Program.cs with a loop at line 11 and a Console.ReadLine).
     if std::env::var("ANVIL_SHOTS").as_deref() == Ok("debug")
@@ -567,6 +576,85 @@ fn type_script(chars: Vec<char>, i: usize) {
     }
     let delay = if c == '\n' { 700 } else { 70 };
     glib::timeout_add_local_once(Duration::from_millis(delay), move || type_script(chars, i + 1));
+}
+
+/// Moves keyboard focus forward `n` times from where it is, as Tab does,
+/// and makes focus rings visible as after a key press.
+fn tab(n: usize) -> Step {
+    act(move || {
+        let app = crate::ui::window::app();
+        app.window.set_focus_visible(true);
+        let root: gtk::Widget = match app.window.visible_dialog() {
+            Some(d) => d.upcast(),
+            None => app.window.clone().upcast(),
+        };
+        for _ in 0..n {
+            root.child_focus(gtk::DirectionType::TabForward);
+        }
+    })
+}
+
+fn keys_steps(sol: PathBuf) -> Vec<Step> {
+    let project_dir = sol.parent().map(|d| d.join(sol.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())).unwrap_or_default();
+    let person = project_dir.join("Person.cs");
+    vec![
+        act(|| crate::ui::window::app().start.refresh()),
+        tab(1),
+        Step::Wait(300),
+        Step::Shot("keys-start-focus"),
+        command("view.feature-search"),
+        Step::Wait(500),
+        Step::Shot("keys-search-empty"),
+        act(|| crate::ui::palette_search::type_query("fmt doc")),
+        Step::Wait(400),
+        Step::Shot("keys-search-fmtdoc"),
+        act(|| crate::ui::palette_search::type_query("keyb")),
+        Step::Wait(400),
+        Step::Shot("keys-search-keyboard"),
+        act(crate::ui::palette_search::close),
+        act(move || window::open_path(&sol)),
+        Step::Wait(1500),
+        act(move || {
+            crate::ui::window::app().tabs.open(&person, false);
+        }),
+        Step::Wait(600),
+        command("view.feature-search"),
+        act(|| crate::ui::palette_search::type_query("pers")),
+        Step::Wait(400),
+        Step::Shot("keys-search-files"),
+        act(crate::ui::palette_search::close),
+        command("edit.replace"),
+        tab(2),
+        Step::Wait(300),
+        Step::Shot("keys-findbar"),
+        act(|| window::show_side("explorer")),
+        command("project.add-new-item"),
+        Step::Wait(800),
+        Step::Shot("keys-newitem"),
+        act(close_dialogs),
+        act(|| crate::ui::dialogs::new_project(None)),
+        Step::Wait(800),
+        Step::Shot("keys-newproject"),
+        act(close_dialogs),
+        command("edit.goto-all"),
+        Step::Wait(800),
+        Step::Shot("keys-gotoall"),
+        act(close_dialogs),
+        command("edit.find-in-files"),
+        Step::Wait(500),
+        Step::Shot("keys-findinfiles"),
+        act(close_dialogs),
+        act(|| crate::ui::settings::show(Some("keyboard"))),
+        Step::Wait(800),
+        Step::Shot("keys-settings"),
+        act(close_dialogs),
+        Step::Theme(adw::ColorScheme::ForceDark),
+        command("view.feature-search"),
+        act(|| crate::ui::palette_search::type_query("build")),
+        Step::Wait(500),
+        Step::Shot("keys-search-dark"),
+        act(crate::ui::palette_search::close),
+    ]
 }
 
 /// Breakpoint with hit count 3 in the loop, F5, Locals, a step (changed

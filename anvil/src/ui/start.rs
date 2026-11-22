@@ -25,7 +25,13 @@ fn big_button(title: &str, detail: &str, icon: &str, command: &str) -> gtk::Butt
     let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
     text.append(&gtk::Label::builder().label(title).xalign(0.0).css_classes(["strong"]).build());
     text.append(&gtk::Label::builder().label(detail).xalign(0.0).wrap(true).css_classes(["hint"]).build());
+    text.set_hexpand(true);
     row.append(&text);
+    // The shortcut, as VS' start window teaches it: keyboard first. The
+    // page is built before the keymap is loaded, so VS' default is shown.
+    if let Some(k) = anvil_core::commands::find(command).and_then(|c| c.keys.first()) {
+        row.append(&gtk::Label::builder().label(*k).valign(gtk::Align::Center).css_classes(["dim", "shortcut"]).build());
+    }
     b.set_child(Some(&row));
     b.set_action_name(Some(&format!("win.{command}")));
     b
@@ -40,7 +46,16 @@ impl StartPage {
         outer.set_margin_end(40);
         outer.set_halign(gtk::Align::Center);
         outer.set_width_request(760);
-        outer.append(&gtk::Label::builder().label(tr("Write it here. Hand it in anywhere.")).xalign(0.0).css_classes(["statement"]).build());
+        // The logo comes from the icon theme; the application adds its
+        // resource path (icons/) to it, so dev builds find it too.
+        let brand = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        brand.set_halign(gtk::Align::Start);
+        let logo = gtk::Image::from_icon_name(crate::APP_ID);
+        logo.set_pixel_size(96);
+        logo.set_halign(gtk::Align::Start);
+        brand.append(&logo);
+        brand.append(&gtk::Label::builder().label("Anvil").xalign(0.0).css_classes(["statement", "brand-title"]).build());
+        outer.append(&brand);
         let cols = gtk::Box::new(gtk::Orientation::Horizontal, 32);
         cols.set_homogeneous(true);
         let left = gtk::Box::new(gtk::Orientation::Vertical, 10);

@@ -567,6 +567,33 @@ list.results > row:selected {
   color: var(--im-ink);
 }
 
+/* Feature Search (Ctrl+Q): a pill in the header, a popover of results. */
+headerbar button.feature-search-button {
+  padding: 0 10px;
+  font-size: 12.5px;
+  background: var(--im-fill);
+}
+
+.shortcut {
+  font-family: "Cascadia Mono", "Geist Mono", monospace;
+  font-size: 11.5px;
+}
+
+list.feature-search > row {
+  padding: 5px 10px;
+  border-radius: var(--im-radius-segmented);
+}
+
+list.feature-search image {
+  -gtk-icon-size: 14px;
+}
+
+/* A problem with what is typed, under the field, in place of an error
+   dialog afterwards. */
+.inline-error {
+  color: var(--im-down);
+}
+
 /* Start page. */
 list.recent {
   background: var(--im-card);

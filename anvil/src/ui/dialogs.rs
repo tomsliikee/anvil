@@ -1,5 +1,5 @@
-//! Open, New Project, Go To All, Insert Snippet, Add Existing Item, Add
-//! Project Reference and Feature Search.
+//! Open, New Project, Go To All, Insert Snippet, Add Existing Item and Add
+//! Project Reference.
 
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -283,14 +283,14 @@ pub fn goto_all() {
             while let Some(c) = list.first_child() {
                 list.remove(&c);
             }
-            let q = q.to_lowercase();
-            let mut idx: Vec<usize> = (0..targets.len()).filter(|&i| q.is_empty() || targets[i].label.to_lowercase().contains(&q)).collect();
-            idx.sort_by_key(|&i| (!targets[i].label.to_lowercase().starts_with(&q), targets[i].label.len()));
-            idx.truncate(80);
-            for &i in &idx {
-                let t = &targets[i];
+            // Fuzzy as in Feature Search: "dlpl" finds DoublyLinkedPersonList.
+            let cands: Vec<anvil_core::search::Candidate> = targets.iter().map(|t| anvil_core::search::Candidate { text: &t.label, alt: None, key: "", weight: 0 }).collect();
+            let ranked = anvil_core::search::rank(&cands, q, &anvil_core::search::Mru::default(), 80);
+            let idx: Vec<usize> = ranked.iter().map(|r| r.index).collect();
+            for r in &ranked {
+                let t = &targets[r.index];
                 let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-                row.append(&gtk::Label::builder().label(&t.label).xalign(0.0).css_classes(["strong"]).build());
+                row.append(&gtk::Label::builder().label(crate::ui::palette_search::highlight(&t.label, &r.text_positions)).use_markup(true).xalign(0.0).css_classes(["strong"]).build());
                 row.append(&gtk::Label::builder().label(&t.detail).xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim"]).build());
                 list.append(&row);
             }
@@ -324,12 +324,10 @@ pub fn goto_all() {
             go(r.index());
         }
     });
-    let l = list.clone();
-    entry.connect_next_match(move |_| {
-        let i = l.selected_row().map_or(0, |r| r.index() + 1);
-        if let Some(r) = l.row_at_index(i) {
-            l.select_row(Some(&r));
-        }
+    crate::ui::palette_search::arrow_keys(&entry, &list, &scroller);
+    let d = dialog.clone();
+    entry.connect_stop_search(move |_| {
+        d.close();
     });
     dialog.present(Some(&app.window));
     entry.grab_focus();
@@ -448,71 +446,4 @@ pub fn add_project_reference() {
             crate::ui::explorer::reload_solution_model();
         });
     });
-}
-
-/// Ctrl+Q: find any command by name.
-pub fn feature_search() {
-    let app = crate::ui::window::app();
-    let entry = gtk::SearchEntry::new();
-    entry.add_css_class("search-entry");
-    let list = gtk::ListBox::new();
-    list.add_css_class("results");
-    let b = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    b.set_margin_top(14);
-    b.set_margin_bottom(14);
-    b.set_margin_start(14);
-    b.set_margin_end(14);
-    b.append(&entry);
-    b.append(&gtk::ScrolledWindow::builder().child(&list).min_content_height(320).build());
-    let dialog = adw::Dialog::builder().title(tr("Feature Search")).child(&b).content_width(560).build();
-    let shown: Rc<std::cell::RefCell<Vec<&'static str>>> = Rc::default();
-    let fill = {
-        let list = list.clone();
-        let shown = shown.clone();
-        move |q: &str| {
-            while let Some(c) = list.first_child() {
-                list.remove(&c);
-            }
-            let q = q.to_lowercase();
-            let mut ids = Vec::new();
-            for c in anvil_core::commands::COMMANDS {
-                let title = tr(c.title);
-                if q.is_empty() || title.to_lowercase().contains(&q) || c.vs_name.to_lowercase().contains(&q) {
-                    let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-                    row.append(&gtk::Label::builder().label(&title).xalign(0.0).hexpand(true).build());
-                    row.append(&gtk::Label::builder().label(crate::ui::window::app().keymap.borrow().label(c.id).unwrap_or_default()).css_classes(["dim"]).build());
-                    list.append(&row);
-                    ids.push(c.id);
-                }
-            }
-            if let Some(r) = list.row_at_index(0) {
-                list.select_row(Some(&r));
-            }
-            *shown.borrow_mut() = ids;
-        }
-    };
-    fill("");
-    let f = fill.clone();
-    entry.connect_search_changed(move |e| f(&e.text()));
-    let run = {
-        let shown = shown.clone();
-        let dialog = dialog.clone();
-        move |i: i32| {
-            let picked = shown.borrow().get(i as usize).copied();
-            if let Some(id) = picked {
-                dialog.close();
-                crate::ui::actions::dispatch(id);
-            }
-        }
-    };
-    let r = run.clone();
-    list.connect_row_activated(move |_, row| r(row.index()));
-    let l = list.clone();
-    entry.connect_activate(move |_| {
-        if let Some(row) = l.selected_row() {
-            run(row.index());
-        }
-    });
-    dialog.present(Some(&app.window));
-    entry.grab_focus();
 }

@@ -18,6 +18,7 @@ pub mod menus;
 pub mod newitem;
 pub mod nuget;
 pub mod output;
+pub mod palette_search;
 pub mod properties;
 pub mod settings;
 pub mod smooth;

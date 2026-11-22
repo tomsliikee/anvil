@@ -160,7 +160,7 @@ pub fn dispatch(id: &str) {
             let _ = app.settings.set_string(crate::theme::KEY, crate::theme::flipped());
             crate::theme::apply(&app.settings);
         }
-        "view.feature-search" => dialogs::feature_search(),
+        "view.feature-search" => crate::ui::palette_search::open(),
         "view.nuget" => nuget::open(explorer::selected_project()),
 
         // Window

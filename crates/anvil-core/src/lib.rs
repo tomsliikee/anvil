@@ -19,6 +19,7 @@ pub mod moves;
 pub mod nuget;
 pub mod planner;
 pub mod routing;
+pub mod search;
 pub mod session;
 pub mod text;
 pub mod tokens;

@@ -353,6 +353,33 @@ mod tests {
         assert_eq!(Keymap::vs_default().conflicts(), Vec::<(String, &str, &str)>::new());
     }
 
+    /// Stricter than `conflicts()`: a Global binding also reaches every
+    /// panel, so the same chord in Global and a panel scope, or a Global
+    /// key that is the first key of a panel's chord, is a duplicate too.
+    /// Only the overlaps VS itself ships are allowed.
+    #[test]
+    fn default_keymap_has_no_duplicate_bindings() {
+        // VS: Alt+Enter is Quick Actions in the editor and Properties
+        // elsewhere.
+        const VS_OVERLAPS: &[(&str, &str, &str)] = &[("Alt+Enter", "edit.quick-actions", "project.properties")];
+        let overlap = |a: Scope, b: Scope| a == b || a == Scope::Global || b == Scope::Global;
+        let all: Vec<(&str, Chord)> = COMMANDS.iter().flat_map(|c| c.keys.iter().map(move |k| (c.id, Chord::parse(k).unwrap()))).collect();
+        let mut dups = Vec::new();
+        for (i, (a, ca)) in all.iter().enumerate() {
+            for (b, cb) in &all[i + 1..] {
+                if !overlap(crate::commands::scope_of(a), crate::commands::scope_of(b)) {
+                    continue;
+                }
+                let same = ca == cb;
+                let shadows = ca.first == cb.first && ca.second.is_none() != cb.second.is_none();
+                if (same || shadows) && !VS_OVERLAPS.iter().any(|(k, x, y)| *k == ca.label() && ([*x, *y] == [*a, *b] || [*y, *x] == [*a, *b])) {
+                    dups.push(format!("{} / {}: {a} and {b}", ca.label(), cb.label()));
+                }
+            }
+        }
+        assert!(dups.is_empty(), "duplicate bindings:\n{}", dups.join("\n"));
+    }
+
     #[test]
     fn conflict_reported() {
         let mut m = Keymap::vs_default();
