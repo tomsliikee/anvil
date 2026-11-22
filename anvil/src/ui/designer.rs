@@ -13,6 +13,7 @@ use anvil_core::cd::{self, Diagram, ShapeKind};
 use anvil_core::csharp::{self, Access, MemberKind, MembersFormat, TypeDecl, TypeKind};
 use anvil_core::hashcode;
 use anvil_core::planner::{self, NewMember};
+use anvil_core::routing;
 use anvil_core::spring::{Params, Spring};
 use anvil_core::text::TextFile;
 use gtk::subclass::prelude::*;
@@ -37,10 +38,25 @@ struct TypeInfo {
     file: PathBuf,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 enum RowKind {
     Section(String),
     Member(usize),
+    /// The "+" row at the end of a compartment: type `Name : Type` or
+    /// `Name(params) : Type` to add a member of that kind.
+    Add(NewMember),
+}
+
+/// A line between two cards.
+#[derive(Clone, Debug)]
+struct Edge {
+    from: usize,
+    to: usize,
+    inherit: bool,
+    /// Inheritance to an interface on the diagram: UML's dashed realization.
+    realize: bool,
+    collection: bool,
+    label: String,
 }
 
 #[derive(Clone, Debug)]
@@ -83,8 +99,19 @@ pub struct State {
     last_frame: Option<i64>,
     /// Fit the diagram into the view at the first frame with a real size.
     fit_pending: bool,
-    /// Lines between cards: (from, to, inheritance?, label).
-    edges: Vec<(usize, usize, bool, String)>,
+    edges: Vec<Edge>,
+    /// Routed lines, recomputed when a card moved.
+    routes: Vec<routing::Route>,
+    routes_dirty: bool,
+    /// Rendered card faces by name with the hash of what they show, so a
+    /// frame of a drag only translates nodes instead of laying out text.
+    faces: HashMap<String, (u64, gsk::RenderNode)>,
+    /// Last pointer position, the centre of Ctrl+wheel zoom.
+    pointer: Option<(f32, f32)>,
+    /// Space held: the primary button pans.
+    space: bool,
+    /// Zoom when a pinch began.
+    pinch_from: f64,
 }
 
 impl State {
@@ -108,7 +135,7 @@ impl State {
         }
         let mut y = c.y + HEADER;
         for (i, (k, _)) in c.rows.iter().enumerate() {
-            let h = if matches!(k, RowKind::Section(_)) { SECTION } else { ROW };
+            let h = row_height(k);
             if wy >= y && wy < y + h {
                 return Some(i);
             }
@@ -116,6 +143,10 @@ impl State {
         }
         None
     }
+}
+
+fn row_height(k: &RowKind) -> f32 {
+    if matches!(k, RowKind::Section(_)) { SECTION } else { ROW }
 }
 
 mod imp {
@@ -213,7 +244,9 @@ impl Canvas {
                 if ctl.current_event_state().contains(gdk::ModifierType::CONTROL_MASK) {
                     let factor = 1.15_f64.powf(-dy);
                     let target = c.st().zoom.map_or(1.0, |z| z.target) * factor;
-                    c.zoom_to(target, None);
+                    // Around the pointer, so what is under it stays there.
+                    let at = c.imp().state.borrow().pointer;
+                    c.zoom_to(target, at);
                 } else {
                     let step = if ctl.unit() == gdk::ScrollUnit::Wheel { 40.0 } else { 1.0 };
                     let mut st = c.st();
@@ -226,6 +259,81 @@ impl Canvas {
             }
         ));
         self.add_controller(scroll);
+
+        let motion = gtk::EventControllerMotion::new();
+        motion.connect_motion(glib::clone!(
+            #[weak(rename_to = c)]
+            self,
+            move |_, x, y| c.st().pointer = Some((x as f32, y as f32))
+        ));
+        motion.connect_leave(glib::clone!(
+            #[weak(rename_to = c)]
+            self,
+            move |_| c.st().pointer = None
+        ));
+        self.add_controller(motion);
+
+        // Space held turns the primary button into a hand, as in drawing
+        // programs.
+        let keys = gtk::EventControllerKey::new();
+        keys.connect_key_pressed(glib::clone!(
+            #[weak(rename_to = c)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, _| {
+                if key == gdk::Key::space {
+                    if !std::mem::replace(&mut c.st().space, true) {
+                        c.set_cursor_from_name(Some("grab"));
+                    }
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            }
+        ));
+        keys.connect_key_released(glib::clone!(
+            #[weak(rename_to = c)]
+            self,
+            move |_, key, _, _| {
+                if key == gdk::Key::space {
+                    c.st().space = false;
+                    c.set_cursor(None);
+                }
+            }
+        ));
+        self.add_controller(keys);
+
+        // Touchpad pinch: the zoom follows the fingers directly, around
+        // their centre.
+        let pinch = gtk::GestureZoom::new();
+        pinch.connect_begin(glib::clone!(
+            #[weak(rename_to = c)]
+            self,
+            move |_, _| {
+                let z = c.imp().state.borrow().zoom() as f64;
+                c.st().pinch_from = z;
+            }
+        ));
+        pinch.connect_scale_changed(glib::clone!(
+            #[weak(rename_to = c)]
+            self,
+            move |g, scale| {
+                let Some((cx, cy)) = g.bounding_box_center() else { return };
+                let target = (c.imp().state.borrow().pinch_from * scale).clamp(0.15, 3.0);
+                let (wx, wy) = c.imp().state.borrow().to_world(cx, cy);
+                let mut st = c.st();
+                if let Some(z) = st.zoom.as_mut() {
+                    z.set(target);
+                }
+                st.pan = (cx as f32 - wx * target as f32, cy as f32 - wy * target as f32);
+                drop(st);
+                c.queue_draw();
+                if let Some(d) = c.doc() {
+                    d.zoom_label.set_label(&format!("{:.0} %", target * 100.0));
+                }
+            }
+        ));
+        self.add_controller(pinch);
 
         let drag = gtk::GestureDrag::new();
         drag.set_button(0);
@@ -242,7 +350,7 @@ impl Canvas {
         drag.connect_drag_end(glib::clone!(
             #[weak(rename_to = c)]
             self,
-            move |_, _, _| c.drag_end()
+            move |g, _, _| c.drag_end(g.current_event_state().contains(gdk::ModifierType::ALT_MASK))
         ));
         self.add_controller(drag);
 
@@ -355,8 +463,16 @@ impl Canvas {
         let (wx, wy) = self.imp().state.borrow().to_world(x, y);
         let hit = self.imp().state.borrow().hit(wx, wy);
         let tool_active = self.imp().state.borrow().tool.is_some();
+        let space = self.imp().state.borrow().space;
         let mut st = self.st();
         match (button, hit) {
+            // Middle button, or Space with the primary one: pan anywhere.
+            (b, _) if b == gdk::BUTTON_MIDDLE || (b == gdk::BUTTON_PRIMARY && space) => {
+                let (px, py) = st.pan;
+                st.panning = Some((px, py, x as f32, y as f32));
+                drop(st);
+                self.set_cursor_from_name(Some("grabbing"));
+            }
             (b, Some(i)) if b == gdk::BUTTON_PRIMARY && !tool_active => {
                 let c = &st.cards[i];
                 let (cx, cy) = (c.x, c.y);
@@ -368,7 +484,7 @@ impl Canvas {
                 st.drag = Some((last, cx, cy, wx, wy, false));
                 st.selected = Some(last);
             }
-            (b, None) if b == gdk::BUTTON_PRIMARY || b == gdk::BUTTON_MIDDLE => {
+            (b, None) if b == gdk::BUTTON_PRIMARY => {
                 let (px, py) = st.pan;
                 st.panning = Some((px, py, x as f32, y as f32));
             }
@@ -389,9 +505,12 @@ impl Canvas {
             if !moved && ox.abs() + oy.abs() < 3.0 {
                 return;
             }
+            // Only the card moves and its lines are rerouted at the next
+            // frame; nothing is parsed or written until the release.
             st.cards[i].x = cx + ox as f32 / z;
             st.cards[i].y = cy + oy as f32 / z;
             st.drag = Some((i, cx, cy, 0.0, 0.0, true));
+            st.routes_dirty = true;
         } else if let Some((px, py, _, _)) = st.panning {
             if st.menu_pending.is_some() {
                 if ox.abs() + oy.abs() < 4.0 {
@@ -408,12 +527,12 @@ impl Canvas {
         self.queue_draw();
     }
 
-    fn drag_end(&self) {
-        let (drag, _, menu) = {
+    fn drag_end(&self, free: bool) {
+        let (drag, _, menu, space) = {
             let mut st = self.st();
-            (st.drag.take(), st.panning.take(), st.menu_pending.take())
+            (st.drag.take(), st.panning.take(), st.menu_pending.take(), st.space)
         };
-        self.set_cursor(None);
+        self.set_cursor_from_name(space.then_some("grab"));
         if let Some((x, y)) = menu {
             self.context_menu(x, y);
             return;
@@ -421,13 +540,16 @@ impl Canvas {
         if let Some((i, ..)) = drag.filter(|d| d.5)
             && let Some(doc) = self.doc()
         {
-            // VS snaps to an eighth of an inch.
+            // VS snaps to an eighth of an inch; Alt held places freely.
             let (name, x, y) = {
                 let mut st = self.st();
+                st.routes_dirty = true;
                 let c = &mut st.cards[i];
-                let snap = |v: f32| (v / 12.0).round() * 12.0;
-                c.x = snap(c.x);
-                c.y = snap(c.y);
+                if !free {
+                    let snap = |v: f32| (v / anvil_core::layout::CLASS_GRID as f32).round() * anvil_core::layout::CLASS_GRID as f32;
+                    c.x = snap(c.x);
+                    c.y = snap(c.y);
+                }
                 (c.name.clone(), c.x, c.y)
             };
             doc.edit_cd(|d| d.move_shape(&name, cd::px_to_inches(x as f64), cd::px_to_inches(y as f64)));
@@ -477,11 +599,25 @@ impl Canvas {
                 return;
             }
         }
-        if n == 2
-            && let Some(i) = hit
-        {
-            doc.open_code(i, row);
+        // A "+" row takes a new member at once; a double-click on a member
+        // edits it in place; a double-click elsewhere on a card opens the
+        // code, as in VS.
+        let kind = |i: usize, r: usize| self.imp().state.borrow().cards[i].rows.get(r).map(|x| x.0.clone());
+        match (hit, row) {
+            (Some(i), Some(r)) if matches!(kind(i, r), Some(RowKind::Add(_))) => doc.inline_edit(i, r),
+            (Some(i), Some(r)) if n == 2 && matches!(kind(i, r), Some(RowKind::Member(_))) => doc.inline_edit(i, r),
+            (Some(i), _) if n == 2 => doc.open_code(i, row),
+            _ => {}
         }
+    }
+
+    /// The row's rectangle in widget coordinates.
+    fn row_rect(&self, card: usize, row: usize) -> Option<gdk::Rectangle> {
+        let st = self.imp().state.borrow();
+        let c = st.cards.get(card)?;
+        let y = c.y + HEADER + c.rows.iter().take(row).map(|(k, _)| row_height(k)).sum::<f32>();
+        let z = st.zoom();
+        Some(gdk::Rectangle::new((c.x * z + st.pan.0) as i32, (y * z + st.pan.1) as i32, (c.w * z) as i32, (ROW * z) as i32))
     }
 
     fn context_menu(&self, x: f64, y: f64) {
@@ -498,6 +634,7 @@ impl Canvas {
     /// Draws everything; with `export` at zoom 1 without grid and minimap.
     fn draw(&self, s: &gtk::Snapshot, export: bool) {
         let p = palette::current();
+        self.prepare(p);
         let st = self.imp().state.borrow();
         let (w, h) = (self.width() as f32, self.height() as f32);
         // The canvas is the editor card's ground; cards sit one step up
@@ -522,7 +659,16 @@ impl Canvas {
         for (i, c) in st.cards.iter().enumerate() {
             let selected = !export && st.selected == Some(i);
             let picked = matches!(st.tool, Some((_, Some(a))) if a == i);
-            draw_card(s, c, &st, &ctx, (p, face), selected || picked, if selected { st.selected_row } else { None });
+            match st.faces.get(&c.name).filter(|_| !export) {
+                Some((_, node)) => {
+                    s.save();
+                    s.translate(&graphene::Point::new(c.x, c.y));
+                    s.append_node(node);
+                    s.restore();
+                    draw_selection(s, c, p, selected || picked, if selected { st.selected_row } else { None });
+                }
+                None => draw_card(s, c, &st, &ctx, (p, face), selected || picked, if selected { st.selected_row } else { None }),
+            }
         }
         if !export {
             s.restore();
@@ -540,6 +686,81 @@ impl Canvas {
                 s.restore();
             }
         }
+    }
+
+    /// Reroutes the lines after a move and renders the card faces whose
+    /// content changed; everything else is reused from the last frame.
+    fn prepare(&self, p: &Palette) {
+        let dark = adw::StyleManager::default().is_dark();
+        let ctx = self.pango_context();
+        let mut st = self.st();
+        if st.routes_dirty || st.routes.len() != st.edges.len() {
+            let rects: Vec<routing::Rect> = st.cards.iter().map(|c| routing::Rect { x: c.x as f64, y: c.y as f64, w: c.w as f64, h: c.h as f64 }).collect();
+            let edges: Vec<(usize, usize, routing::EdgeKind)> = st.edges.iter().map(|e| (e.from, e.to, if e.inherit { routing::EdgeKind::Inheritance } else { routing::EdgeKind::Association })).collect();
+            st.routes = routing::route_all(&rects, &edges);
+            st.routes_dirty = false;
+        }
+        let face = if dark { &p.fill } else { &p.bar };
+        let mut old = std::mem::take(&mut st.faces);
+        let mut faces = HashMap::with_capacity(st.cards.len());
+        for c in &st.cards {
+            let key = face_key(c, &st, dark);
+            let node = match old.remove(&c.name) {
+                Some((k, n)) if k == key => Some(n),
+                _ => {
+                    let mut at_origin = c.clone();
+                    at_origin.x = 0.0;
+                    at_origin.y = 0.0;
+                    let snap = gtk::Snapshot::new();
+                    draw_card(&snap, &at_origin, &st, &ctx, (p, face), false, None);
+                    snap.to_node()
+                }
+            };
+            if let Some(n) = node {
+                faces.insert(c.name.clone(), (key, n));
+            }
+        }
+        st.faces = faces;
+    }
+
+    /// Frame cost of dragging a card, measured by building the frames a
+    /// drag produces off screen: (first frame, mean, worst) in ms.
+    pub fn measure_drag(&self, frames: usize) -> Option<(f64, f64, f64)> {
+        let n = self.imp().state.borrow().cards.len();
+        if n == 0 || frames < 2 {
+            return None;
+        }
+        self.st().faces.clear();
+        let (x0, y0) = {
+            let st = self.imp().state.borrow();
+            (st.cards[0].x, st.cards[0].y)
+        };
+        let mut times = Vec::with_capacity(frames);
+        for f in 0..frames {
+            {
+                let mut st = self.st();
+                st.cards[0].x = x0 + f as f32 * 3.0;
+                st.cards[0].y = y0 + f as f32 * 2.0;
+                st.routes_dirty = true;
+            }
+            let t = std::time::Instant::now();
+            let s = gtk::Snapshot::new();
+            self.draw(&s, false);
+            let _ = s.to_node();
+            times.push(t.elapsed().as_secs_f64() * 1000.0);
+        }
+        {
+            let mut st = self.st();
+            st.cards[0].x = x0;
+            st.cards[0].y = y0;
+            st.routes_dirty = true;
+        }
+        self.queue_draw();
+        // The first frame rendered every face (as after opening); the rest
+        // are what a drag costs.
+        let cold = times.remove(0);
+        let mean = times.iter().sum::<f64>() / times.len().max(1) as f64;
+        Some((cold, mean, times.iter().copied().fold(0.0, f64::max)))
     }
 
     /// The whole diagram at zoom 1, for export: (node, bounds).
@@ -672,48 +893,125 @@ fn draw_card(s: &gtk::Snapshot, c: &Card, st: &State, ctx: &gtk::pango::Context,
                 text_at(s, ctx, text, MEMBER_FACE, (c.x + PAD_X, y + 3.0, c.w - 2.0 * PAD_X), &p.ink);
                 y += ROW;
             }
+            RowKind::Add(_) => {
+                text_at(s, ctx, text, "Inter 8", (c.x + PAD_X, y + 4.0, c.w - 2.0 * PAD_X), &p.ink3);
+                y += ROW;
+            }
         }
     }
 }
 
-fn card_anchor(c: &Card, toward: (f32, f32)) -> (f32, f32) {
-    let (cx, cy) = (c.x + c.w / 2.0, c.y + c.h / 2.0);
-    let (dx, dy) = (toward.0 - cx, toward.1 - cy);
-    if dx.abs() * c.h > dy.abs() * c.w {
-        (if dx > 0.0 { c.x + c.w } else { c.x }, cy + dy * (c.w / 2.0) / dx.abs().max(1.0))
-    } else {
-        (cx + dx * (c.h / 2.0) / dy.abs().max(1.0), if dy > 0.0 { c.y + c.h } else { c.y })
+/// What a card face shows, hashed: a cached face is reused while this
+/// stays the same.
+fn face_key(c: &Card, st: &State, dark: bool) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (&c.name, c.kind.element(), c.w.to_bits(), c.h.to_bits(), &c.rows, c.collapsed, &c.comment, dark).hash(&mut h);
+    kind_chip(c, st).hash(&mut h);
+    c.ty.map(|t| st.types[t].decl.bases.join(",")).hash(&mut h);
+    h.finish()
+}
+
+/// Selection drawn over a cached face: the outline and the picked row.
+fn draw_selection(s: &gtk::Snapshot, c: &Card, p: &Palette, selected: bool, selected_row: Option<usize>) {
+    if !selected {
+        return;
+    }
+    let rr = rounded(graphene::Rect::new(c.x, c.y, c.w, c.h), RADIUS);
+    s.append_border(&rr, &[1.5; 4], &[p.ink2; 4]);
+    if let Some(r) = selected_row.filter(|_| !c.collapsed)
+        && matches!(c.rows.get(r), Some((RowKind::Member(_), _)))
+    {
+        let y = c.y + HEADER + c.rows.iter().take(r).map(|(k, _)| row_height(k)).sum::<f32>();
+        fill_rounded(s, rounded(graphene::Rect::new(c.x + 4.0, y, c.w - 8.0, ROW), 6.0), &palette::fade(&p.ink3, 0.18));
+    }
+}
+
+/// An orthogonal polyline with small rounded corners.
+fn polyline(points: &[(f32, f32)], radius: f32) -> gsk::Path {
+    let b = gsk::PathBuilder::new();
+    let Some(&(x0, y0)) = points.first() else { return b.to_path() };
+    b.move_to(x0, y0);
+    for w in points.windows(3) {
+        let (a, c, d) = (w[0], w[1], w[2]);
+        let len = |p: (f32, f32), q: (f32, f32)| (p.0 - q.0).abs() + (p.1 - q.1).abs();
+        let r = radius.min(len(a, c) / 2.0).min(len(c, d) / 2.0);
+        let toward = |from: (f32, f32), to: (f32, f32), r: f32| {
+            let l = len(from, to).max(0.001);
+            (to.0 + (from.0 - to.0) * r / l, to.1 + (from.1 - to.1) * r / l)
+        };
+        let before = toward(a, c, r);
+        let after = toward(d, c, r);
+        b.line_to(before.0, before.1);
+        b.quad_to(c.0, c.1, after.0, after.1);
+    }
+    if let Some(&(x, y)) = points.last() {
+        b.line_to(x, y);
+    }
+    b.to_path()
+}
+
+/// UML heads at `tip`, pointing along `dir` (unit vector into the target):
+/// a hollow triangle for inheritance and realization, an open arrow for an
+/// association, a double open arrow for a collection association (VS).
+fn draw_head(s: &gtk::Snapshot, tip: (f32, f32), dir: (f32, f32), e: &Edge, p: &Palette, ground: &gdk::RGBA) {
+    let stroke = gsk::Stroke::new(1.2);
+    let normal = (-dir.1, dir.0);
+    let at = |back: f32, side: f32| (tip.0 - dir.0 * back + normal.0 * side, tip.1 - dir.1 * back + normal.1 * side);
+    if e.inherit {
+        let (l, half) = (13.0, 7.0);
+        let (p1, p2) = (at(l, half), at(l, -half));
+        let head = gsk::PathBuilder::new();
+        head.move_to(tip.0, tip.1);
+        head.line_to(p1.0, p1.1);
+        head.line_to(p2.0, p2.1);
+        head.close();
+        let path = head.to_path();
+        s.append_fill(&path, gsk::FillRule::Winding, ground);
+        s.append_stroke(&path, &stroke, &p.ink2);
+        return;
+    }
+    let arrows: &[f32] = if e.collection { &[0.0, 6.0] } else { &[0.0] };
+    for &off in arrows {
+        let t = at(off, 0.0);
+        let (p1, p2) = (at(off + 9.0, 5.0), at(off + 9.0, -5.0));
+        let head = gsk::PathBuilder::new();
+        head.move_to(p1.0, p1.1);
+        head.line_to(t.0, t.1);
+        head.line_to(p2.0, p2.1);
+        s.append_stroke(&head.to_path(), &stroke, &p.ink2);
     }
 }
 
 fn draw_edges(s: &gtk::Snapshot, st: &State, p: &Palette, ctx: &gtk::pango::Context, ground: &gdk::RGBA) {
-    for (a, b, inherit, label) in &st.edges {
-        let (Some(ca), Some(cb)) = (st.cards.get(*a), st.cards.get(*b)) else { continue };
-        let to = card_anchor(cb, (ca.x + ca.w / 2.0, ca.y + ca.h / 2.0));
-        let from = card_anchor(ca, to);
-        let builder = gsk::PathBuilder::new();
-        builder.move_to(from.0, from.1);
-        builder.line_to(to.0, to.1);
-        let stroke = gsk::Stroke::new(1.2);
-        s.append_stroke(&builder.to_path(), &stroke, &p.ink2);
-        // Head: a hollow triangle for inheritance, an open arrow for an
-        // association.
-        let ang = (from.1 - to.1).atan2(from.0 - to.0);
-        let (l, wing) = (12.0_f32, 0.45_f32);
-        let p1 = (to.0 + l * (ang + wing).cos(), to.1 + l * (ang + wing).sin());
-        let p2 = (to.0 + l * (ang - wing).cos(), to.1 + l * (ang - wing).sin());
-        let head = gsk::PathBuilder::new();
-        head.move_to(p1.0, p1.1);
-        head.line_to(to.0, to.1);
-        head.line_to(p2.0, p2.1);
-        if *inherit {
-            head.close();
-            s.append_fill(&head.to_path(), gsk::FillRule::Winding, ground);
+    for (e, route) in st.edges.iter().zip(&st.routes) {
+        let pts: Vec<(f32, f32)> = route.points.iter().map(|&(x, y)| (x as f32, y as f32)).collect();
+        if pts.len() < 2 {
+            continue;
         }
-        s.append_stroke(&head.to_path(), &stroke, &p.ink2);
-        if !label.is_empty() {
-            let (mx, my) = ((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0);
-            text_at(s, ctx, label, "Cascadia Mono 8", (mx + 4.0, my - 14.0, 200.0), &p.ink2);
+        let (a, tip) = (pts[pts.len() - 2], pts[pts.len() - 1]);
+        let l = ((tip.0 - a.0).powi(2) + (tip.1 - a.1).powi(2)).sqrt().max(0.001);
+        let dir = ((tip.0 - a.0) / l, (tip.1 - a.1) / l);
+        // The line stops where the head starts, so a hollow triangle stays
+        // empty inside.
+        let mut line = pts.clone();
+        let back: f32 = if e.inherit { 13.0 } else { 0.0 };
+        if let Some(last) = line.last_mut() {
+            *last = (tip.0 - dir.0 * back.min(l), tip.1 - dir.1 * back.min(l));
+        }
+        let stroke = gsk::Stroke::new(1.2);
+        if e.realize {
+            stroke.set_dash(&[5.0, 4.0]);
+        }
+        s.append_stroke(&polyline(&line, 6.0), &stroke, &p.ink2);
+        draw_head(s, tip, dir, e, p, ground);
+        if !e.label.is_empty() {
+            // Beside the target end, as VS writes the member name there.
+            let (lx, ly) = if l > 40.0 { (tip.0 - dir.0 * 22.0, tip.1 - dir.1 * 22.0) } else { (route.label_at.0 as f32, route.label_at.1 as f32) };
+            let w = text_width(ctx, &e.label, "Cascadia Mono 8");
+            let (x, y) = if dir.0.abs() > 0.5 { (lx - w / 2.0, ly - 16.0) } else { (lx + 6.0, ly - 7.0) };
+            fill_rounded(s, rounded(graphene::Rect::new(x - 3.0, y, w + 6.0, 14.0), 4.0), ground);
+            text_at(s, ctx, &e.label, "Cascadia Mono 8", (x, y, w + 4.0), &p.ink2);
         }
     }
     // Lollipops: implemented interfaces not on the diagram, a small ring
@@ -837,7 +1135,20 @@ fn rows_for(decl: &TypeDecl, format: MembersFormat, collapsed: &[String], groupi
         for (i, m) in members {
             out.push((RowKind::Member(i), m.display(format)));
         }
+        let add = match compartment_key(&title).as_str() {
+            "Fields" => Some((NewMember::Field, tr("+ Add field"))),
+            "Properties" => Some((NewMember::Property, tr("+ Add property"))),
+            "Methods" => Some((NewMember::Method, tr("+ Add method"))),
+            "Events" => Some((NewMember::Event, tr("+ Add event"))),
+            _ => None,
+        };
+        if let Some((k, label)) = add {
+            out.push((RowKind::Add(k), label));
+        }
     }
+    // Always one way in, also for a type without members: `Name : Type`
+    // adds a property, `Name(params) : Type` a method.
+    out.push((RowKind::Add(NewMember::Property), tr("+ Add member")));
     if !decl.nested.is_empty() {
         out.push((RowKind::Section("Nested Types".into()), tr("Nested Types")));
         if !collapsed.iter().any(|c| c == "Nested Types") {
@@ -975,7 +1286,7 @@ impl DiagramDoc {
             let hide: Vec<String> = sh.show_as_association.iter().chain(&sh.show_as_collection).cloned().collect();
             let rows = ty.map(|t| rows_for(&st.types[t].decl, format, &sh.collapsed_compartments, &grouping, &hide)).unwrap_or_default();
             let w = cd::inches_to_px(sh.width) as f32;
-            let body: f32 = rows.iter().map(|(k, _)| if matches!(k, RowKind::Section(_)) { SECTION } else { ROW }).sum();
+            let body: f32 = rows.iter().map(|(k, _)| row_height(k)).sum();
             let h = if sh.kind == ShapeKind::Comment { sh.height.map_or(72.0, |h| cd::inches_to_px(h) as f32) } else if sh.collapsed { HEADER } else { HEADER + body + 8.0 };
             cards.push(Card { name: sh.name.clone(), kind: sh.kind, x: cd::inches_to_px(sh.x) as f32, y: cd::inches_to_px(sh.y) as f32, w, h, ty, rows, collapsed: sh.collapsed, comment: if sh.kind == ShapeKind::Comment { sh.name.clone() } else { String::new() } });
         }
@@ -986,7 +1297,7 @@ impl DiagramDoc {
             for b in &st.types[t].decl.bases {
                 let base = b.split('<').next().unwrap_or(b);
                 if let Some(j) = cards.iter().position(|o| short_name(&o.name) == base) {
-                    edges.push((i, j, true, String::new()));
+                    edges.push(Edge { from: i, to: j, inherit: true, realize: cards[j].kind == ShapeKind::Interface && c.kind != ShapeKind::Interface, collection: false, label: String::new() });
                 }
             }
             let sh = shapes.iter().find(|s| s.name == c.name);
@@ -994,12 +1305,14 @@ impl DiagramDoc {
                 let Some(member) = st.types[t].decl.members.iter().find(|x| x.name == m) else { continue };
                 let ty = member.ty.clone().unwrap_or_default();
                 let target = ty.trim_end_matches("[]").trim_end_matches('?').split(['<', '>']).rfind(|x| !x.is_empty()).unwrap_or(&ty).to_owned();
-                if let Some(j) = cards.iter().position(|o| short_name(&o.name) == target) {
-                    edges.push((i, j, false, m.clone()));
+                if let Some(j) = cards.iter().position(|o| short_name(&o.name) == target).filter(|&j| j != i) {
+                    let collection = sh.is_some_and(|s| s.show_as_collection.contains(&m));
+                    edges.push(Edge { from: i, to: j, inherit: false, realize: false, collection, label: m.clone() });
                 }
             }
         }
         st.edges = edges;
+        st.routes_dirty = true;
         st.format = format;
         st.cards = cards;
         st.selected = selected_name.and_then(|n| st.cards.iter().position(|c| c.name == n));
@@ -1010,7 +1323,7 @@ impl DiagramDoc {
     }
 
     /// Changes the `.cd` as one undo step.
-    fn edit_cd(&self, f: impl FnOnce(&mut Diagram)) {
+    pub(crate) fn edit_cd(&self, f: impl FnOnce(&mut Diagram)) {
         let before = self.diagram.borrow().file.text.clone();
         f(&mut self.diagram.borrow_mut());
         if self.diagram.borrow().file.text != before {
@@ -1197,6 +1510,72 @@ impl DiagramDoc {
                 _ => None,
             })
             .expect("the diagram is open")
+    }
+
+    /// Edits a member row in place, or takes a new member on a "+" row, in
+    /// the card's short form (`Name : Type`, `Name(params) : Type`). Enter
+    /// applies it through the planner as one undo step; Escape cancels.
+    fn inline_edit(&self, card: usize, row: usize) {
+        let Some(t) = self.type_of_card(card) else { return };
+        let Some(rect) = self.canvas.row_rect(card, row) else { return };
+        let kind = self.canvas.imp().state.borrow().cards[card].rows.get(row).map(|r| r.0.clone());
+        let (start, member) = match kind {
+            Some(RowKind::Member(m)) => match t.decl.members.get(m) {
+                Some(x) if x.kind != MemberKind::EnumValue => (planner::member_spec_text(x), Some((x.name.clone(), x.kind))),
+                _ => return,
+            },
+            Some(RowKind::Add(_)) => (String::new(), None),
+            _ => return,
+        };
+        let section = match kind {
+            Some(RowKind::Add(k)) => k,
+            _ => NewMember::Property,
+        };
+        let entry = gtk::Entry::builder().text(start.as_str()).width_chars(28).placeholder_text(tr("Name : Type or Name(params) : Type")).build();
+        entry.add_css_class("monospace");
+        let pop = gtk::Popover::builder().child(&entry).has_arrow(false).position(gtk::PositionType::Bottom).build();
+        pop.set_parent(&self.canvas);
+        // Over the row itself: the popover opens below the rectangle, so it
+        // points at a line one row higher.
+        let r = gdk::Rectangle::new(rect.x(), rect.y() - rect.height() + 2, rect.width().max(40), 1);
+        pop.set_pointing_to(Some(&r));
+        let me = Rc::downgrade(&self.self_rc());
+        let (tname, file) = (t.full_name.clone(), t.file.clone());
+        let p2 = pop.clone();
+        entry.connect_activate(move |e| {
+            let Some(doc) = me.upgrade() else { return };
+            let Some(text) = Self::file_text(&file) else { return };
+            let st = csharp::parse(&text);
+            let typed = e.text().to_string();
+            let result = match &member {
+                Some((name, kind)) => planner::edit_member(&text, &st, &tname, name, *kind, &typed).map_err(|x| x.to_string()),
+                None => planner::parse_member_spec(&typed, section)
+                    .map_err(|x| x.to_string())
+                    .and_then(|spec| planner::add_member_spec(&text, &st, &tname, &spec).map(|edit| vec![edit]).map_err(|x| x.to_string())),
+            };
+            match result {
+                Ok(edits) => {
+                    p2.popdown();
+                    if !edits.is_empty() {
+                        doc.apply_code(vec![(file.clone(), edits)], |_| {});
+                    }
+                    doc.canvas.grab_focus();
+                }
+                // Stays open so the text can be fixed.
+                Err(msg) => {
+                    e.add_css_class("error");
+                    window::toast(&trf("Not applied: {}", &[&msg]));
+                }
+            }
+        });
+        pop.connect_closed(|p| {
+            let p = p.clone();
+            // Unparent after the close animation's signal has run.
+            glib::idle_add_local_once(move || p.unparent());
+        });
+        pop.popup();
+        entry.grab_focus();
+        entry.select_region(0, -1);
     }
 
     /// Adds a member through the planner (card context menu, toolbox).
@@ -1401,18 +1780,33 @@ impl DiagramDoc {
         let _ = t;
     }
 
-    fn layout(&self) {
+    pub(crate) fn layout(&self) {
         let st = self.canvas.imp().state.borrow();
-        let sizes: Vec<anvil_core::layout::Size> = st.cards.iter().map(|c| anvil_core::layout::Size { w: c.h as f64, h: c.w as f64 }).collect();
-        // Base classes above derived ones: the layered layout runs left to
-        // right, so it gets transposed sizes and its result is transposed.
-        let edges: Vec<(usize, usize)> = st.edges.iter().filter(|e| e.2).map(|e| (e.1, e.0)).collect();
+        let sizes: Vec<anvil_core::layout::Size> = st.cards.iter().map(|c| anvil_core::layout::Size { w: c.w as f64, h: c.h as f64 }).collect();
+        // Base classes above derived ones; an owner above the types its
+        // fields and properties hold, so the course's list stands above
+        // its nodes and the nodes above the person.
+        let inheritance: Vec<(usize, usize)> = st.edges.iter().filter(|e| e.inherit).map(|e| (e.from, e.to)).collect();
+        let mut uses: Vec<(usize, usize)> = Vec::new();
+        for (i, c) in st.cards.iter().enumerate() {
+            let Some(t) = c.ty else { continue };
+            for m in st.types[t].decl.members.iter().filter(|m| matches!(m.kind, MemberKind::Field | MemberKind::Property)) {
+                let ty = m.ty.as_deref().unwrap_or_default();
+                for word in ty.split(|ch: char| !(ch.is_alphanumeric() || ch == '_')).filter(|w| !w.is_empty()) {
+                    if let Some(j) = st.cards.iter().position(|o| short_name(&o.name) == word && o.ty.is_some())
+                        && !uses.contains(&(i, j))
+                    {
+                        uses.push((i, j));
+                    }
+                }
+            }
+        }
         let names: Vec<String> = st.cards.iter().map(|c| c.name.clone()).collect();
         drop(st);
-        let pts = anvil_core::layout::layered(&sizes, &edges);
+        let pts = anvil_core::layout::class_layout(&sizes, &inheritance, &uses, 24.0);
         self.edit_cd(|d| {
             for (n, p) in names.iter().zip(pts) {
-                d.move_shape(n, cd::px_to_inches(p.y + 24.0), cd::px_to_inches(p.x + 24.0));
+                d.move_shape(n, cd::px_to_inches(p.x), cd::px_to_inches(p.y));
             }
         });
         self.canvas.fit();

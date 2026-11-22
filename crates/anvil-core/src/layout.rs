@@ -114,6 +114,111 @@ pub fn layered(sizes: &[Size], edges: &[(usize, usize)]) -> Vec<Point> {
     pos
 }
 
+/// Grid of the Class Designer: VS snaps shapes to an eighth of an inch.
+pub const CLASS_GRID: f64 = 12.0;
+
+/// *Layout Diagram* for a class diagram: base classes above their derived
+/// classes, owners above the types they hold (`uses`, weaker: dropped where
+/// it would close a cycle with inheritance), each connected part laid out
+/// layered top to bottom, parts side by side left to right, cards without
+/// relations last. `inheritance` is (derived, base), `uses` is (owner,
+/// part). Positions are top-left corners, snapped to [`CLASS_GRID`] and
+/// starting at `margin`.
+pub fn class_layout(sizes: &[Size], inheritance: &[(usize, usize)], uses: &[(usize, usize)], margin: f64) -> Vec<Point> {
+    let n = sizes.len();
+    let mut edges: Vec<(usize, usize)> = inheritance.iter().copied().filter(|&(a, b)| a != b && a < n && b < n).collect();
+    // A uses edge joins only when it does not point back up an inheritance
+    // chain (base owning a derived would put the derived above its base).
+    let reaches = |from: usize, to: usize, edges: &[(usize, usize)]| {
+        let mut seen = vec![false; n];
+        let mut stack = vec![from];
+        while let Some(v) = stack.pop() {
+            if v == to {
+                return true;
+            }
+            if std::mem::replace(&mut seen[v], true) {
+                continue;
+            }
+            stack.extend(edges.iter().filter(|e| e.0 == v).map(|e| e.1));
+        }
+        false
+    };
+    for &(owner, part) in uses {
+        if owner == part || owner >= n || part >= n || edges.contains(&(part, owner)) {
+            continue;
+        }
+        // (child, parent) for the layered layout: the part is the child.
+        if !reaches(owner, part, &edges) {
+            edges.push((part, owner));
+        }
+    }
+    // Connected parts.
+    let mut part_of = vec![usize::MAX; n];
+    let mut parts: Vec<Vec<usize>> = Vec::new();
+    for start in 0..n {
+        if part_of[start] != usize::MAX {
+            continue;
+        }
+        let id = parts.len();
+        let mut stack = vec![start];
+        let mut members = Vec::new();
+        part_of[start] = id;
+        while let Some(v) = stack.pop() {
+            members.push(v);
+            for &(a, b) in &edges {
+                for w in [if a == v { Some(b) } else { None }, if b == v { Some(a) } else { None }].into_iter().flatten() {
+                    if part_of[w] == usize::MAX {
+                        part_of[w] = id;
+                        stack.push(w);
+                    }
+                }
+            }
+        }
+        members.sort_unstable();
+        parts.push(members);
+    }
+    // Each part through the layered layout, transposed: its columns become
+    // rows, so parents stand above their children.
+    let mut pos = vec![Point { x: 0.0, y: 0.0 }; n];
+    let mut boxes: Vec<(Vec<usize>, Size)> = Vec::new();
+    for members in &parts {
+        let local: Vec<Size> = members.iter().map(|&v| Size { w: sizes[v].h, h: sizes[v].w }).collect();
+        let local_edges: Vec<(usize, usize)> = edges
+            .iter()
+            .filter_map(|&(c, p)| Some((members.binary_search(&c).ok()?, members.binary_search(&p).ok()?)))
+            .collect();
+        let pts = layered(&local, &local_edges);
+        let (mut w, mut h) = (0.0_f64, 0.0_f64);
+        for (&v, p) in members.iter().zip(&pts) {
+            pos[v] = Point { x: p.y, y: p.x };
+            w = w.max(p.y + sizes[v].w);
+            h = h.max(p.x + sizes[v].h);
+        }
+        boxes.push((members.clone(), Size { w, h }));
+    }
+    // Pack left to right, big parts first, wrapping at about a 16:9 view.
+    boxes.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then(a.0[0].cmp(&b.0[0])));
+    let area: f64 = boxes.iter().map(|(_, s)| (s.w + GAP_Y) * (s.h + GAP_Y)).sum();
+    let widest = boxes.iter().map(|(_, s)| s.w).fold(0.0, f64::max);
+    let row_limit = (area * 16.0 / 9.0).sqrt().max(widest);
+    let (mut x, mut y, mut row_h) = (0.0_f64, 0.0_f64, 0.0_f64);
+    for (members, size) in &boxes {
+        if x > 0.0 && x + size.w > row_limit {
+            x = 0.0;
+            y += row_h + GAP_X;
+            row_h = 0.0;
+        }
+        for &v in members {
+            pos[v].x += x;
+            pos[v].y += y;
+        }
+        x += size.w + GAP_X;
+        row_h = row_h.max(size.h);
+    }
+    let snap = |v: f64| ((v + margin) / CLASS_GRID).round() * CLASS_GRID;
+    pos.into_iter().map(|p| Point { x: snap(p.x), y: snap(p.y) }).collect()
+}
+
 fn layout_part(
     members: &[usize],
     sizes: &[Size],
@@ -263,5 +368,33 @@ mod tests {
         let sizes: Vec<Size> = (0..20).map(|i| Size { w: 150.0 + i as f64, h: 60.0 }).collect();
         let edges: Vec<(usize, usize)> = (1..20).map(|i| (i, i / 3)).collect();
         assert_eq!(layered(&sizes, &edges), layered(&sizes, &edges));
+    }
+
+    #[test]
+    fn class_layout_puts_bases_above_and_snaps() {
+        // 0 Animal, 1 Dog : Animal, 2 Cat : Animal, 3 Owner uses Dog, 4 alone.
+        let sizes: Vec<Size> = (0..5).map(|i| Size { w: 150.0 + 10.0 * i as f64, h: 100.0 }).collect();
+        let pos = class_layout(&sizes, &[(1, 0), (2, 0)], &[(3, 1)], 24.0);
+        assert!(pos[0].y + sizes[0].h < pos[1].y, "base above derived: {pos:?}");
+        assert!(pos[0].y + sizes[0].h < pos[2].y);
+        assert!(pos[3].y + sizes[3].h < pos[1].y, "owner above part: {pos:?}");
+        for p in &pos {
+            assert_eq!(p.x % CLASS_GRID, 0.0);
+            assert_eq!(p.y % CLASS_GRID, 0.0);
+            assert!(p.x >= 24.0 && p.y >= 24.0);
+        }
+        for i in 0..5 {
+            for j in i + 1..5 {
+                assert!(!overlaps(pos[i], sizes[i], pos[j], sizes[j]), "{i} overlaps {j}");
+            }
+        }
+    }
+
+    #[test]
+    fn class_layout_ignores_uses_against_inheritance() {
+        // Base 0 holds a derived 1: inheritance wins, the base stays on top.
+        let sizes = vec![Size { w: 100.0, h: 80.0 }; 2];
+        let pos = class_layout(&sizes, &[(1, 0)], &[(0, 1), (1, 1)], 0.0);
+        assert!(pos[0].y < pos[1].y, "{pos:?}");
     }
 }

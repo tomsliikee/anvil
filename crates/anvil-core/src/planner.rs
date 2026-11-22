@@ -10,7 +10,7 @@
 use crate::csharp::{Access, FileStructure, Member, MemberKind, TypeDecl, TypeKind};
 use crate::edit::TextEdit;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NewMember {
     Method,
     Property,
@@ -99,17 +99,18 @@ fn step(text: &str) -> &'static str {
 
 /// The member stub text, without indentation on the first line and with
 /// `indent` on the following ones.
-fn member_text(m: NewMember, name: &str, ty: &str, access: Access, indent: &str, step: &str) -> String {
+fn member_text(m: NewMember, name: &str, ty: &str, params: &str, access: Access, indent: &str, step: &str) -> String {
     let a = access.keyword();
+    let p = params;
     let i = indent;
     let s = step;
     match m {
-        NewMember::Method => format!("{a} {ty} {name}()\n{i}{{\n{i}{s}throw new NotImplementedException();\n{i}}}"),
+        NewMember::Method => format!("{a} {ty} {name}({p})\n{i}{{\n{i}{s}throw new NotImplementedException();\n{i}}}"),
         NewMember::Property => format!("{a} {ty} {name}\n{i}{{\n{i}{s}get => throw new NotImplementedException();\n{i}{s}set => throw new NotImplementedException();\n{i}}}"),
         NewMember::Field => format!("{a} {ty} {name};"),
         NewMember::Event => format!("{a} event {ty} {name};"),
         NewMember::Constant => format!("{a} const {ty} {name} = 0;"),
-        NewMember::Constructor => format!("{a} {name}()\n{i}{{\n{i}}}"),
+        NewMember::Constructor => format!("{a} {name}({p})\n{i}{{\n{i}}}"),
         NewMember::Destructor => format!("{name}()\n{i}{{\n{i}}}"),
     }
 }
@@ -118,6 +119,12 @@ fn member_text(m: NewMember, name: &str, ty: &str, access: Access, indent: &str,
 /// the type; a blank line separates it from multi-line neighbours as VS
 /// formats them.
 pub fn add_member(text: &str, file: &FileStructure, type_name: &str, m: NewMember, name: &str, ty: &str, access: Access) -> Result<TextEdit, PlanError> {
+    add_member_spec(text, file, type_name, &MemberSpec { kind: m, name: name.to_owned(), ty: ty.to_owned(), params: String::new(), access })
+}
+
+/// [`add_member`] with parameters, for the card's "+" row.
+pub fn add_member_spec(text: &str, file: &FileStructure, type_name: &str, spec: &MemberSpec) -> Result<TextEdit, PlanError> {
+    let (m, name, ty, access) = (spec.kind, spec.name.as_str(), spec.ty.as_str(), spec.access);
     let t = find(file, type_name)?;
     let (open, close) = match (t.open_brace, t.close_brace) {
         (Some(o), Some(c)) => (o, c),
@@ -125,7 +132,7 @@ pub fn add_member(text: &str, file: &FileStructure, type_name: &str, m: NewMembe
     };
     let st = step(text);
     let indent = t.members.first().map(|x| indent_at(text, x.range.start)).unwrap_or_else(|| format!("{}{st}", indent_at(text, t.range.start)));
-    let body = member_text(m, name, ty, access, &indent, st);
+    let body = member_text(m, name, ty, &spec.params, access, &indent, st);
     let multi = body.contains('\n');
     let same_kind = t.members.iter().rev().find(|x| x.kind == m.kind());
     if let Some(prev) = same_kind.or(t.members.last()) {
@@ -346,6 +353,275 @@ pub fn rename_member_decl(file: &FileStructure, type_name: &str, name: &str, kin
     Ok(TextEdit::new(m.name_range.start, m.name_range.end, new_name))
 }
 
+/// A member typed on a card in the diagram's short form:
+/// `[access] Name [(params)] [: Type]`. Access is a keyword or UML's
+/// `+` `-` `#` `~`; parameters are C# (`int a`) or UML (`a : int`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MemberSpec {
+    pub kind: NewMember,
+    pub name: String,
+    pub ty: String,
+    /// C# parameter list without parentheses (`int a, string b`).
+    pub params: String,
+    pub access: Access,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SpecError {
+    Empty,
+    BadName(String),
+    BadType(String),
+    BadParams(String),
+}
+
+impl std::fmt::Display for SpecError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SpecError::Empty => write!(f, "nothing typed"),
+            SpecError::BadName(n) => write!(f, "{n:?} is not a valid name"),
+            SpecError::BadType(t) => write!(f, "{t:?} is not a valid type"),
+            SpecError::BadParams(p) => write!(f, "{p:?} is not a valid parameter list"),
+        }
+    }
+}
+
+impl std::error::Error for SpecError {}
+
+fn is_identifier(s: &str) -> bool {
+    let s = s.strip_prefix('@').unwrap_or(s);
+    let mut c = s.chars();
+    c.next().is_some_and(|f| f == '_' || f.is_alphabetic()) && c.all(|x| x == '_' || x.is_alphanumeric())
+}
+
+/// A type as written in a declaration: identifiers, dots, generics,
+/// arrays, nullable, tuples; nothing that ends or opens a statement.
+fn is_type(s: &str) -> bool {
+    let s = s.trim();
+    if s.is_empty() || s.contains([';', '{', '}', '=', '"', '\'']) {
+        return false;
+    }
+    let mut depth = [0i32; 3];
+    for ch in s.chars() {
+        match ch {
+            '<' => depth[0] += 1,
+            '>' => depth[0] -= 1,
+            '[' => depth[1] += 1,
+            ']' => depth[1] -= 1,
+            '(' => depth[2] += 1,
+            ')' => depth[2] -= 1,
+            c if c.is_alphanumeric() || " _.,?@*".contains(c) => {}
+            _ => return false,
+        }
+        if depth.iter().any(|d| *d < 0) {
+            return false;
+        }
+    }
+    // A space is only allowed inside brackets (`Dictionary<string, int>`).
+    let top_level_space = {
+        let mut d = 0;
+        s.chars().any(|c| {
+            match c {
+                '<' | '[' | '(' => d += 1,
+                '>' | ']' | ')' => d -= 1,
+                _ => {}
+            }
+            c == ' ' && d == 0
+        })
+    };
+    depth == [0, 0, 0] && !top_level_space && s.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_' || c == '(' || c == '@')
+}
+
+/// Splits at top-level commas (not inside `<>`, `[]`, `()`).
+fn split_top(s: &str) -> Vec<&str> {
+    let (mut out, mut depth, mut start) = (Vec::new(), 0i32, 0);
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '<' | '[' | '(' => depth += 1,
+            '>' | ']' | ')' => depth -= 1,
+            ',' if depth == 0 => {
+                out.push(&s[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(&s[start..]);
+    out
+}
+
+const PARAM_MODIFIERS: [&str; 5] = ["ref", "out", "in", "params", "this"];
+
+fn parse_params(s: &str) -> Result<String, SpecError> {
+    if s.trim().is_empty() {
+        return Ok(String::new());
+    }
+    let bad = || SpecError::BadParams(s.to_owned());
+    let mut out = Vec::new();
+    for p in split_top(s) {
+        let p = p.trim();
+        let (ty, name, modifier) = if let Some((n, t)) = p.split_once(':') {
+            // UML: `a : int`, `ref a : int`.
+            let mut words: Vec<&str> = n.split_whitespace().collect();
+            let name = words.pop().ok_or_else(bad)?;
+            (t.trim().to_owned(), name.to_owned(), words.join(" "))
+        } else {
+            // C#: `int a`, `ref int a`, `List<int> xs`.
+            let (rest, name) = p.rsplit_once(char::is_whitespace).ok_or_else(bad)?;
+            let mut rest = rest.trim();
+            let mut modifier = String::new();
+            for m in PARAM_MODIFIERS {
+                if let Some(r) = rest.strip_prefix(m).filter(|r| r.starts_with(char::is_whitespace)) {
+                    modifier = m.to_owned();
+                    rest = r.trim();
+                }
+            }
+            (rest.to_owned(), name.to_owned(), modifier)
+        };
+        if !is_identifier(&name) || !is_type(&ty) || !(modifier.is_empty() || PARAM_MODIFIERS.contains(&modifier.as_str())) {
+            return Err(bad());
+        }
+        out.push(if modifier.is_empty() { format!("{ty} {name}") } else { format!("{modifier} {ty} {name}") });
+    }
+    Ok(out.join(", "))
+}
+
+/// Reads the short form typed into a compartment's "+" row (`section`
+/// says which: a field, property, event or method row). Parentheses make
+/// a method in any section; without a type a method returns `void`, an
+/// event is an `EventHandler` and anything else an `int` (VS' defaults).
+pub fn parse_member_spec(input: &str, section: NewMember) -> Result<MemberSpec, SpecError> {
+    let mut s = input.trim().trim_end_matches(';').trim();
+    if s.is_empty() {
+        return Err(SpecError::Empty);
+    }
+    let mut access = Access::Public;
+    for (prefix, a) in [("+", Access::Public), ("-", Access::Private), ("#", Access::Protected), ("~", Access::Internal)] {
+        if let Some(r) = s.strip_prefix(prefix) {
+            access = a;
+            s = r.trim_start();
+        }
+    }
+    for (word, a) in [("public ", Access::Public), ("private ", Access::Private), ("protected ", Access::Protected), ("internal ", Access::Internal)] {
+        if let Some(r) = s.strip_prefix(word) {
+            access = a;
+            s = r.trim_start();
+        }
+    }
+    // The type follows the last colon after the parameters (UML
+    // parameters have their own colons inside the parentheses).
+    let close = s.rfind(')');
+    let (head, ty) = match s.rfind(':').filter(|&i| close.is_none_or(|c| i > c)) {
+        Some(i) => (s[..i].trim(), Some(s[i + 1..].trim())),
+        None => (s, None),
+    };
+    let (name, params) = match head.find('(') {
+        Some(open) => {
+            let inner = head[open + 1..].strip_suffix(')').ok_or_else(|| SpecError::BadParams(head[open..].to_owned()))?;
+            (head[..open].trim(), Some(parse_params(inner)?))
+        }
+        None => (head, None),
+    };
+    if !is_identifier(name) {
+        return Err(SpecError::BadName(name.to_owned()));
+    }
+    if let Some(t) = ty
+        && !is_type(t)
+    {
+        return Err(SpecError::BadType(t.to_owned()));
+    }
+    let kind = match (&params, section) {
+        (Some(_), _) | (None, NewMember::Method) => NewMember::Method,
+        (None, k) => k,
+    };
+    let default = match kind {
+        NewMember::Method => "void",
+        NewMember::Event => "EventHandler",
+        _ => "int",
+    };
+    Ok(MemberSpec { kind, name: name.to_owned(), ty: ty.unwrap_or(default).to_owned(), params: params.unwrap_or_default(), access })
+}
+
+fn params_text(m: &Member) -> String {
+    m.params
+        .iter()
+        .map(|p| match &p.modifier {
+            Some(md) => format!("{md} {} {}", p.ty, p.name),
+            None => format!("{} {}", p.ty, p.name),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// What an inline edit of a member on a card starts with:
+/// `Name(int a) : Type`.
+pub fn member_spec_text(m: &Member) -> String {
+    let mut s = m.name.clone();
+    if matches!(m.kind, MemberKind::Method | MemberKind::Constructor) {
+        s = format!("{s}({})", params_text(m));
+    }
+    if let Some(t) = &m.ty {
+        s = format!("{s} : {t}");
+    }
+    s
+}
+
+/// The edits that turn a member into what was typed over it inline: its
+/// name (the declaration only; references are Roslyn's job), its type and
+/// its parameters. Empty when nothing changed.
+pub fn edit_member(text: &str, file: &FileStructure, type_name: &str, name: &str, kind: MemberKind, input: &str) -> Result<Vec<TextEdit>, SpecError> {
+    let t = file.find(type_name).ok_or_else(|| SpecError::BadName(type_name.to_owned()))?;
+    let m = t.members.iter().find(|x| x.name == name && x.kind == kind).ok_or_else(|| SpecError::BadName(name.to_owned()))?;
+    let section = match kind {
+        MemberKind::Method | MemberKind::Constructor | MemberKind::Destructor | MemberKind::Operator => NewMember::Method,
+        MemberKind::Property | MemberKind::Indexer => NewMember::Property,
+        MemberKind::Event => NewMember::Event,
+        _ => NewMember::Field,
+    };
+    let typed = input.trim();
+    let spec = parse_member_spec(typed, section)?;
+    let mut edits = Vec::new();
+    // Only what was written changes: no colon keeps the type.
+    if let Some(old) = &m.ty
+        && typed.contains(':')
+        && spec.ty != *old
+    {
+        let decl = &text[m.range.start..m.name_range.start];
+        if let Some(pos) = decl.rfind(old.as_str()) {
+            edits.push(TextEdit::new(m.range.start + pos, m.range.start + pos + old.len(), &spec.ty));
+        }
+    }
+    if spec.name != m.name {
+        edits.push(TextEdit::new(m.name_range.start, m.name_range.end, &spec.name));
+    }
+    if typed.contains('(') && matches!(kind, MemberKind::Method | MemberKind::Constructor) {
+        let norm = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+        if norm(&params_text(m)) != norm(&spec.params)
+            && let Some(open) = text[m.name_range.end..m.range.end].find('(').map(|i| m.name_range.end + i)
+            && let Some(close) = matching_paren(text, open)
+        {
+            edits.push(TextEdit::new(open + 1, close, &spec.params));
+        }
+    }
+    Ok(edits)
+}
+
+fn matching_paren(text: &str, open: usize) -> Option<usize> {
+    let mut depth = 0;
+    for (i, ch) in text[open..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(open + i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,5 +738,64 @@ mod tests {
         let vs = course("ListNode.cs");
         assert!(vs.starts_with(&text[..text.find("    {").unwrap()]), "header as in VS' ListNode.cs");
         assert!(text.ends_with("    public class ListNode\n    {\n    }\n}"));
+    }
+
+    #[test]
+    fn member_spec_short_forms() {
+        let m = parse_member_spec("Count : int", NewMember::Property).unwrap();
+        assert_eq!((m.kind, m.name.as_str(), m.ty.as_str(), m.access), (NewMember::Property, "Count", "int", Access::Public));
+        let m = parse_member_spec("- count : int", NewMember::Field).unwrap();
+        assert_eq!((m.kind, m.access), (NewMember::Field, Access::Private));
+        let m = parse_member_spec("Add(Person p, int index) : bool", NewMember::Field).unwrap();
+        assert_eq!((m.kind, m.params.as_str(), m.ty.as_str()), (NewMember::Method, "Person p, int index", "bool"));
+        let m = parse_member_spec("Find(name : string, ref n : int) : List<Person>", NewMember::Method).unwrap();
+        assert_eq!((m.params.as_str(), m.ty.as_str()), ("string name, ref int n", "List<Person>"));
+        let m = parse_member_spec("Map(Dictionary<string, int> m)", NewMember::Method).unwrap();
+        assert_eq!((m.params.as_str(), m.ty.as_str()), ("Dictionary<string, int> m", "void"));
+        let m = parse_member_spec("Clear", NewMember::Method).unwrap();
+        assert_eq!((m.kind, m.ty.as_str(), m.params.as_str()), (NewMember::Method, "void", ""));
+        assert_eq!(parse_member_spec("Changed", NewMember::Event).unwrap().ty, "EventHandler");
+        assert!(parse_member_spec("x : int; Evil()", NewMember::Field).is_err());
+        assert!(parse_member_spec("x : int x", NewMember::Field).is_err());
+        assert!(parse_member_spec("1abc", NewMember::Field).is_err());
+        assert!(parse_member_spec("Add(Person) : void", NewMember::Method).is_err());
+        assert_eq!(parse_member_spec("  ", NewMember::Field), Err(SpecError::Empty));
+    }
+
+    #[test]
+    fn add_method_with_parameters_from_the_card() {
+        let src = course("DoublyLinkedPersonList.cs");
+        let f = parse(&src);
+        let spec = parse_member_spec("AddLast(Person p) : void", NewMember::Method).unwrap();
+        let out = run(&src, add_member_spec(&src, &f, "doublyLinkedList.DoublyLinkedPersonList", &spec));
+        assert!(out.contains("        public void AddLast(Person p)\n        {\n            throw new NotImplementedException();\n        }"), "{out}");
+        let parsed = parse(&out);
+        let m = &parsed.find("doublyLinkedList.DoublyLinkedPersonList").unwrap().members[0];
+        assert_eq!((m.params.len(), m.params[0].ty.as_str()), (1, "Person"));
+    }
+
+    #[test]
+    fn inline_edit_renames_retypes_and_changes_parameters() {
+        let src = course("ListNode.cs");
+        let f = parse(&src);
+        let t = "doublyLinkedList.ListNode";
+        // Rename only.
+        let e = edit_member(&src, &f, t, "prev", MemberKind::Field, "previous").unwrap();
+        let out = apply(&src, &e);
+        assert!(out.contains("        public ListNode previous;\n"), "{out}");
+        assert_eq!(out.len(), src.len() + 4);
+        // Name and type in one step.
+        let e = edit_member(&src, &f, t, "p", MemberKind::Field, "person : Person?").unwrap();
+        assert_eq!(e.len(), 2);
+        assert!(apply(&src, &e).contains("        private Person? person;\n"));
+        // Constructor parameters.
+        let ctor = f.find(t).unwrap().members.iter().find(|m| m.kind == MemberKind::Constructor).unwrap().clone();
+        assert_eq!(member_spec_text(&ctor), "ListNode(Person p, ListNode prev, ListNode next)");
+        let e = edit_member(&src, &f, t, "ListNode", MemberKind::Constructor, "ListNode(Person p)").unwrap();
+        assert!(apply(&src, &e).contains("        internal ListNode(Person p)\n"));
+        // The text it starts with changes nothing.
+        let prev = f.find(t).unwrap().members.iter().find(|m| m.name == "Prev").unwrap().clone();
+        assert!(edit_member(&src, &f, t, "Prev", MemberKind::Property, &member_spec_text(&prev)).unwrap().is_empty());
+        assert!(edit_member(&src, &f, t, "ListNode", MemberKind::Constructor, &member_spec_text(&ctor)).unwrap().is_empty());
     }
 }

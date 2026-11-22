@@ -581,6 +581,28 @@ msgstr "Diagramm als Bild exportieren"
 msgid "{} written."
 msgstr "{} geschrieben."
 
+msgid "+ Add field"
+msgstr "+ Feld hinzufügen"
+
+msgid "+ Add property"
+msgstr "+ Eigenschaft hinzufügen"
+
+msgid "+ Add method"
+msgstr "+ Methode hinzufügen"
+
+msgid "+ Add event"
+msgstr "+ Ereignis hinzufügen"
+
+msgid "+ Add member"
+msgstr "+ Member hinzufügen"
+
+msgid "Name : Type or Name(params) : Type"
+msgstr "Name : Typ oder Name(Parameter) : Typ"
+
+#, rust-format
+msgid "Not applied: {}"
+msgstr "Nicht übernommen: {}"
+
 #: anvil/src/ui/designer.rs:1490 anvil/src/ui/designer.rs:1571
 #: anvil/src/ui/explorer.rs:413 anvil/src/ui/explorer.rs:415
 #: anvil/src/ui/explorer.rs:446 anvil/src/ui/newitem.rs:78
