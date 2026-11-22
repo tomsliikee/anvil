@@ -104,6 +104,11 @@ pub const COMMANDS: &[CommandDef] = &[
     cmd!("window.previous-document", "Window.PreviousDocumentWindow", "Previous Document", ["Ctrl+Shift+F6", "Ctrl+Alt+PageUp"]),
     cmd!("window.pin-tab", "Window.PinTab", "Pin Tab", []),
     cmd!("window.split", "Window.Split", "Split", []),
+    cmd!("window.move-to-next-group", "Window.MovetoNextTabGroup", "Move to Next Document Group", []),
+    cmd!("window.switch-next", "Window.NextDocumentWindowNav", "Switch to Next File", ["Ctrl+Tab"]),
+    cmd!("window.switch-previous", "Window.PreviousDocumentWindowNav", "Switch to Previous File", ["Ctrl+Shift+Tab"]),
+    cmd!("window.close-tool-window", "Window.CloseToolWindow", "Hide Panel", ["Shift+Escape"]),
+    cmd!("window.reset-layout", "Window.ResetWindowLayout", "Reset Window Layout", []),
     // Build
     cmd!("build.solution", "Build.BuildSolution", "Build Solution", ["Ctrl+Shift+B"]),
     cmd!("build.rebuild-solution", "Build.RebuildSolution", "Rebuild Solution", []),

@@ -139,6 +139,10 @@ fn scope_of(window: &adw::ApplicationWindow) -> (Scope, bool) {
 
 fn on_key(window: &adw::ApplicationWindow, _ctl: &gtk::EventControllerKey, key: gdk::Key, code: u32, state: gdk::ModifierType) -> glib::Propagation {
     let Some(app) = crate::ui::window::try_app() else { return glib::Propagation::Proceed };
+    // The Ctrl+Tab switcher owns Tab, the arrows, Enter and Escape while open.
+    if app.switcher.handle_key(key) == glib::Propagation::Stop {
+        return glib::Propagation::Stop;
+    }
     let Some(combo) = combo(window, key, code, state) else { return glib::Propagation::Proceed };
     let (scope, typing) = scope_of(window);
     // In an entry, plain keys belong to the entry.

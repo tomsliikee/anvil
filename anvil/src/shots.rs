@@ -472,6 +472,54 @@ fn ui_steps(sol: PathBuf) -> Vec<Step> {
         Step::Shot("ui-settings-dark"),
         act(close_dialogs),
     ]);
+    let sol2 = sol_again(&files[0]);
+    steps.extend([
+        // Layout: split editor (one file twice), Git Changes docked left,
+        // Output moved to the right.
+        Step::Theme(adw::ColorScheme::ForceLight),
+        act(|| {
+            let app = crate::ui::window::app();
+            app.tabs.view.set_selected_page(&app.tabs.view.nth_page(0));
+            app.tabs.focus_current();
+            crate::ui::actions::dispatch("window.split");
+            app.dock.move_to("git", crate::ui::dock::DockArea::Left);
+            app.dock.move_to("output", crate::ui::dock::DockArea::Right);
+            app.dock.show("errors");
+        }),
+        Step::Wait(800),
+        Step::Shot("ui-layout-light"),
+        act(|| crate::ui::window::app().switcher.step(true)),
+        Step::Wait(400),
+        Step::Shot("ui-switcher-light"),
+        act(|| {
+            crate::ui::window::app().switcher.handle_key(gtk::gdk::Key::Escape);
+        }),
+        act(|| {
+            let _ = crate::ui::window::app().settings.set_string("density", "compact");
+        }),
+        Step::Wait(600),
+        Step::Shot("ui-compact-light"),
+        Step::Theme(adw::ColorScheme::ForceDark),
+        Step::Wait(600),
+        Step::Shot("ui-compact-dark"),
+        // Close and reopen: the layout, the split and the tabs come back.
+        act(|| {
+            let app = crate::ui::window::app();
+            if let Some(c) = app.tabs.current_code() {
+                c.goto_line_col(30, 4);
+            }
+            window::close_solution();
+        }),
+        Step::Wait(600),
+        act(move || window::open_path(&sol2)),
+        Step::Wait(1500),
+        act(|| {
+            let app = crate::ui::window::app();
+            let caret = app.tabs.current_code().map(|c| c.buffer.iter_at_mark(&c.buffer.get_insert()).line());
+            println!("anvil: reopened git={:?} output={:?} group2={:?} caret={caret:?}", app.dock.area_of("git"), app.dock.area_of("output"), app.tabs.group_paths(1));
+        }),
+        Step::Shot("ui-reopened-dark"),
+    ]);
     steps
 }
 
@@ -655,6 +703,12 @@ fn keys_steps(sol: PathBuf) -> Vec<Step> {
         Step::Shot("keys-search-dark"),
         act(crate::ui::palette_search::close),
     ]
+}
+
+/// The solution again, from one of its files (`ui_steps` moved `sol`).
+fn sol_again(file: &Path) -> PathBuf {
+    let dir = file.parent().and_then(Path::parent).unwrap_or(Path::new("/"));
+    anvil_core::solution::Solution::find_in(dir).unwrap_or_default()
 }
 
 /// Breakpoint with hit count 3 in the loop, F5, Locals, a step (changed

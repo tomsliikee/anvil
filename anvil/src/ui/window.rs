@@ -12,7 +12,8 @@ use anvil_core::solution::Solution;
 use gtk::{gio, glib};
 
 use crate::i18n::{tr, trf};
-use crate::ui::{build, chat, debugger, editor, errorlist, explorer, find, git, lsp, menus, output, start, status, terminal, tests};
+use crate::ui::dock::{Dock, DockArea};
+use crate::ui::{build, chat, debugger, editor, errorlist, explorer, find, git, lsp, menus, output, start, status, tabswitch, terminal, tests};
 use crate::APP_ID;
 
 pub struct App {
@@ -24,9 +25,9 @@ pub struct App {
     pub center: gtk::Stack,
     pub tabs: Rc<editor::Tabs>,
     pub explorer: Rc<explorer::Explorer>,
-    pub side: adw::ViewStack,
-    pub bottom: adw::ViewStack,
-    pub vpaned: gtk::Paned,
+    /// The tool windows, docked left, right or at the bottom.
+    pub dock: Rc<Dock>,
+    pub switcher: tabswitch::Switcher,
     pub errors: Rc<errorlist::ErrorList>,
     pub output: Rc<output::Output>,
     pub terminal: Rc<terminal::Terminal>,
@@ -42,9 +43,6 @@ pub struct App {
     pub toolbar: Toolbar,
     pub toast: adw::ToastOverlay,
     pub watcher: crate::ui::watch::Watcher,
-    /// The bottom and side cards; hidden while the start page shows.
-    pub bottom_panel: gtk::Box,
-    pub side_panel: gtk::Box,
     /// Bumped whenever the solution changes, so late async results for an
     /// old solution are dropped.
     pub generation: Cell<u64>,
@@ -146,76 +144,6 @@ fn build_toolbar() -> Toolbar {
     Toolbar { widget, startup, filling_startup: Cell::new(false), start, start_label, busy, start_icon, debug_controls, ai }
 }
 
-/// A Mono card with a row of tab buttons over a stack.
-pub fn tabbed_panel(stack: &adw::ViewStack, extra: Option<&gtk::Widget>) -> gtk::Box {
-    let card = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    card.add_css_class("card-panel");
-    let header = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-    header.add_css_class("panel-header");
-    let tabs = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-    tabs.add_css_class("panel-tabs");
-    // Long (German) titles scroll instead of widening the window.
-    let tabs_scroller = gtk::ScrolledWindow::builder().child(&tabs).hscrollbar_policy(gtk::PolicyType::External).vscrollbar_policy(gtk::PolicyType::Never).hexpand(true).propagate_natural_height(true).build();
-    header.append(&tabs_scroller);
-    if let Some(e) = extra {
-        header.append(e);
-    }
-    card.append(&header);
-    stack.set_vexpand(true);
-    card.append(stack);
-    let rebuild = glib::clone!(
-        #[weak]
-        tabs,
-        #[weak]
-        stack,
-        move || {
-            while let Some(c) = tabs.first_child() {
-                tabs.remove(&c);
-            }
-            let pages = stack.pages();
-            let mut group: Option<gtk::ToggleButton> = None;
-            for i in 0..pages.n_items() {
-                let Some(page) = pages.item(i).and_downcast::<adw::ViewStackPage>() else { continue };
-                if !page.is_visible() {
-                    continue;
-                }
-                let name = page.name().map(|n| n.to_string()).unwrap_or_default();
-                let b = gtk::ToggleButton::with_label(&page.title().map(|t| t.to_string()).unwrap_or_default());
-                if let Some(g) = &group {
-                    b.set_group(Some(g));
-                } else {
-                    group = Some(b.clone());
-                }
-                b.set_active(stack.visible_child_name().as_deref() == Some(name.as_str()));
-                b.connect_toggled(glib::clone!(
-                    #[weak]
-                    stack,
-                    move |b| {
-                        if b.is_active() {
-                            stack.set_visible_child_name(&name);
-                        }
-                    }
-                ));
-                tabs.append(&b);
-            }
-        }
-    );
-    // `pages()` hands out a model only as long as someone holds it; the
-    // handler keeps it alive, or pages added and removed later (the
-    // debugger's windows) would leave stale tabs behind.
-    let r = rebuild.clone();
-    let pages = stack.pages();
-    let keep = pages.clone();
-    pages.connect_items_changed(move |_, _, _, _| {
-        let _ = &keep;
-        r();
-    });
-    let r = rebuild.clone();
-    stack.connect_visible_child_name_notify(move |_| r());
-    rebuild();
-    card
-}
-
 pub fn build(application: &adw::Application) -> Rc<App> {
     let settings = gio::Settings::new(APP_ID);
     let window = adw::ApplicationWindow::builder()
@@ -256,61 +184,41 @@ pub fn build(application: &adw::Application) -> Rc<App> {
     center.add_named(&tabs.widget, Some("work"));
     center.set_vexpand(true);
 
-    // Bottom panel.
+    // Tool windows: VS' places by default, the user's from the layout.
     let errors = Rc::new(errorlist::ErrorList::new());
     let output = Rc::new(output::Output::new());
     let terminal = Rc::new(terminal::Terminal::new());
     let find_results = Rc::new(find::FindResults::new());
     let tests = Rc::new(tests::TestExplorer::new());
     let debugger = Rc::new(debugger::Debugger::new());
-    let bottom = adw::ViewStack::new();
-    bottom.add_titled(&errors.widget, Some("errors"), &tr("Error List"));
-    bottom.add_titled(&output.widget, Some("output"), &tr("Output"));
-    bottom.add_titled(&terminal.widget, Some("terminal"), &tr("Terminal"));
-    bottom.add_titled(&tests.widget, Some("tests"), &tr("Test Explorer"));
-    bottom.add_titled(&find_results.widget, Some("find"), &tr("Find Results"));
-    bottom.add_titled(&crate::ui::ide::references_widget(), Some("references"), &tr("Find All References"));
-    debugger.add_pages(&bottom);
-    let bottom_panel = tabbed_panel(&bottom, None);
-
-    let vpaned = gtk::Paned::new(gtk::Orientation::Vertical);
-    vpaned.set_start_child(Some(&center));
-    vpaned.set_end_child(Some(&bottom_panel));
-    vpaned.set_resize_end_child(false);
-    vpaned.set_shrink_end_child(false);
-    vpaned.set_wide_handle(true);
-    vpaned.add_css_class("split");
-
-    // Side panel: Solution Explorer, Git Changes, AI Chat.
     let explorer = Rc::new(explorer::Explorer::new());
     let git = Rc::new(git::GitPanel::new());
     let chat = Rc::new(chat::Chat::new());
-    let side = adw::ViewStack::new();
-    side.add_titled(&explorer.widget, Some("explorer"), &tr("Solution Explorer"));
-    side.add_titled(&git.widget, Some("git"), &tr("Git Changes"));
-    let chat_page = side.add_titled(&chat.widget, Some("chat"), &tr("AI Chat"));
-    chat_page.set_visible(settings.boolean("ai-enabled") && settings.boolean("ai-chat"));
-    let side_panel = tabbed_panel(&side, None);
-    side_panel.set_width_request(260);
-
-    let hpaned = gtk::Paned::new(gtk::Orientation::Horizontal);
-    hpaned.set_start_child(Some(&vpaned));
-    hpaned.set_end_child(Some(&side_panel));
-    hpaned.set_resize_end_child(false);
-    hpaned.set_shrink_end_child(false);
-    hpaned.set_wide_handle(true);
-    hpaned.add_css_class("split");
-    hpaned.set_margin_start(12);
-    hpaned.set_margin_end(12);
+    let dock = Dock::new(&center);
+    dock.add(&errors.widget, "errors", &tr("Error List"), DockArea::Bottom);
+    dock.add(&output.widget, "output", &tr("Output"), DockArea::Bottom);
+    dock.add(&terminal.widget, "terminal", &tr("Terminal"), DockArea::Bottom);
+    dock.add(&tests.widget, "tests", &tr("Test Explorer"), DockArea::Bottom);
+    dock.add(&find_results.widget, "find", &tr("Find Results"), DockArea::Bottom);
+    dock.add(&crate::ui::ide::references_widget(), "references", &tr("Find All References"), DockArea::Bottom);
+    debugger.add_pages(&dock);
+    dock.add(&explorer.widget, "explorer", &tr("Solution Explorer"), DockArea::Right);
+    dock.add(&git.widget, "git", &tr("Git Changes"), DockArea::Right);
+    dock.add(&chat.widget, "chat", &tr("AI Chat"), DockArea::Right);
+    dock.set_available("chat", settings.boolean("ai-enabled") && settings.boolean("ai-chat"));
+    let switcher = tabswitch::Switcher::new();
 
     let status = status::StatusBar::new();
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     content.append(&header);
-    hpaned.set_vexpand(true);
-    content.append(&hpaned);
+    content.append(&dock.widget);
     content.append(&status.widget);
+    // The Ctrl+Tab switcher floats over everything.
+    let overlay = gtk::Overlay::new();
+    overlay.set_child(Some(&content));
+    overlay.add_overlay(&switcher.widget);
     let toast = adw::ToastOverlay::new();
-    toast.set_child(Some(&content));
+    toast.set_child(Some(&overlay));
     window.set_content(Some(&toast));
 
     let app = Rc::new(App {
@@ -322,9 +230,8 @@ pub fn build(application: &adw::Application) -> Rc<App> {
         center,
         tabs,
         explorer,
-        side,
-        bottom,
-        vpaned: vpaned.clone(),
+        dock,
+        switcher,
         errors,
         output,
         terminal,
@@ -340,8 +247,6 @@ pub fn build(application: &adw::Application) -> Rc<App> {
         toolbar,
         toast,
         watcher: crate::ui::watch::Watcher::new(),
-        bottom_panel: bottom_panel.clone(),
-        side_panel: side_panel.clone(),
         generation: Cell::new(0),
     });
     APP.with(|a| {
@@ -352,6 +257,8 @@ pub fn build(application: &adw::Application) -> Rc<App> {
     app.toolbar.widget.set_tooltip_text(None);
     app.toolbar.start.set_tooltip_text(Some(&crate::commands::tooltip("debug.start")));
     app.tabs.connect();
+    app.switcher.connect(&app.window);
+    crate::ui::density::apply(&app.window, &app.settings);
     app.explorer.connect();
     app.errors.connect();
     app.start.connect();
@@ -375,22 +282,15 @@ pub fn build(application: &adw::Application) -> Rc<App> {
         if key.starts_with("ai-") {
             let app = crate::ui::window::app();
             let on = s.boolean("ai-enabled");
-            if let Some(page) = Some(app.side.page(&app.chat.widget)) {
-                page.set_visible(on && s.boolean("ai-chat"));
-            }
+            app.dock.set_available("chat", on && s.boolean("ai-chat"));
+        }
+        if key == crate::ui::density::KEY {
+            let app = crate::ui::window::app();
+            crate::ui::density::apply(&app.window, s);
         }
     });
 
-    // Sizes.
-    vpaned.set_position(settings.int("window-height") - settings.int("bottom-height") - 140);
-    hpaned.set_position(settings.int("window-width") - settings.int("side-width") - 24);
-    window.connect_close_request(glib::clone!(
-        #[weak]
-        hpaned,
-        #[weak]
-        vpaned,
-        #[upgrade_or]
-        glib::Propagation::Proceed,
+    window.connect_close_request(
         move |w| {
             let s = gio::Settings::new(APP_ID);
             let (width, height) = (w.width(), w.height());
@@ -399,12 +299,6 @@ pub fn build(application: &adw::Application) -> Rc<App> {
                 let _ = s.set_int("window-height", height);
             }
             let _ = s.set_boolean("window-maximized", w.is_maximized());
-            // The panels are hidden on the start page; their sizes are
-            // only meaningful while they show.
-            if crate::ui::window::app().side_panel.is_visible() {
-                let _ = s.set_int("side-width", (width - hpaned.position() - 24).max(220));
-                let _ = s.set_int("bottom-height", (height - vpaned.position() - 140).max(120));
-            }
             if !confirm_close() {
                 return glib::Propagation::Stop;
             }
@@ -412,9 +306,11 @@ pub fn build(application: &adw::Application) -> Rc<App> {
             crate::ui::window::app().lsp.stop();
             glib::Propagation::Proceed
         }
-    ));
+    );
     app.center.set_visible_child_name("start");
-    app.bottom.set_visible_child_name("errors");
+    if let Some(l) = anvil_core::session::Layout::from_json(&app.settings.string(crate::ui::session::LAYOUT_KEY)) {
+        app.dock.apply(&l);
+    }
     app.start.refresh();
     set_workspace(false);
     app
@@ -424,20 +320,8 @@ pub fn build(application: &adw::Application) -> Rc<App> {
 /// the run buttons come with a solution or a file.
 pub fn set_workspace(on: bool) {
     let app = crate::ui::window::app();
-    app.bottom_panel.set_visible(on);
-    app.side_panel.set_visible(on);
     app.toolbar.widget.set_visible(on);
-    if on {
-        let (w, h) = (app.window.width(), app.window.height());
-        if h > 0 {
-            app.vpaned.set_position((h - app.settings.int("bottom-height") - 140).max(200));
-        }
-        if let Some(hp) = app.vpaned.parent().and_downcast::<gtk::Paned>()
-            && w > 0
-        {
-            hp.set_position((w - app.settings.int("side-width") - 24).max(400));
-        }
-    }
+    app.dock.set_workspace(on);
 }
 
 /// Unsaved files: VS asks once for all of them.
@@ -475,8 +359,7 @@ pub fn save_session() {
     let Some(dir) = app.solution.borrow().as_ref().map(|s| s.dir.clone()) else { return };
     {
         let mut s = app.session.borrow_mut();
-        s.open_files = app.tabs.open_paths();
-        s.active_file = app.tabs.current_path();
+        crate::ui::session::capture(&app, &mut s);
         s.breakpoints = app.debugger.breakpoints();
     }
     if let Err(e) = app.session.borrow().save(&dir) {
@@ -549,15 +432,11 @@ pub fn open_solution(path: &Path) {
     app.debugger.load_breakpoints(&session.breakpoints);
     crate::ui::jobs::trace("open solution: explorer + breakpoints done");
     app.center.set_visible_child_name("work");
+    let layout = crate::ui::session::layout_for(&app, &session);
+    crate::ui::session::apply_window(&app, &layout);
+    app.dock.apply(&layout);
     set_workspace(true);
-    for f in &session.open_files {
-        if f.exists() {
-            app.tabs.open(f, false);
-        }
-    }
-    if let Some(f) = session.active_file.as_ref().filter(|f| f.exists()) {
-        app.tabs.open(f, false);
-    }
+    crate::ui::session::restore_tabs(&app, &session);
     crate::ui::jobs::trace("open solution: open files done");
     app.watcher.watch(solution_dir().as_deref());
     app.lsp.reset_restarts();
@@ -688,18 +567,14 @@ pub fn toast(text: &str) {
     crate::ui::jobs::info(text);
 }
 
-/// Shows a page of the bottom panel and makes sure the panel is open.
+/// Shows a tool window wherever it docks and opens its area. The names
+/// are kept from when there was one bottom and one side panel.
 pub fn show_bottom(name: &str) {
-    let app = crate::ui::window::app();
-    app.bottom.set_visible_child_name(name);
-    let h = app.vpaned.height();
-    if h > 0 && app.vpaned.position() > h - 80 {
-        app.vpaned.set_position(h - app.settings.int("bottom-height"));
-    }
+    crate::ui::window::app().dock.show(name);
 }
 
 pub fn show_side(name: &str) {
-    crate::ui::window::app().side.set_visible_child_name(name);
+    crate::ui::window::app().dock.show(name);
 }
 
 pub fn solution_dir() -> Option<PathBuf> {

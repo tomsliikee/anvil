@@ -36,12 +36,13 @@ fn choice(title: &str, key: &'static str, nicks: &'static [&'static str], labels
 }
 
 fn general_page() -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder().title(tr("General")).name("general").icon_name("preferences-system-symbolic").build();
+    let page = adw::PreferencesPage::builder().title(tr("Environment")).name("general").icon_name("preferences-system-symbolic").build();
     let g = adw::PreferencesGroup::new();
     let language = choice(&tr("Language"), "language", &["system", "en", "de"], &[tr("System"), "English".into(), "Deutsch".into()]);
     language.set_subtitle(&tr("Takes effect after a restart."));
     g.add(&language);
     g.add(&choice(&tr("Appearance"), crate::theme::KEY, &["system", "light", "dark"], &[tr("Follow System"), tr("Light"), tr("Dark")]));
+    g.add(&choice(&tr("Density"), crate::ui::density::KEY, &["comfortable", "compact"], &[tr("Comfortable"), tr("Compact")]));
     g.add(&choice(&tr("Format of new solutions"), "new-solution-format", &["slnx", "sln"], &[".slnx (Visual Studio 2026)".into(), ".sln".into()]));
     page.add(&g);
     page

@@ -14,6 +14,10 @@
     <value nick="slnx" value="0"/>
     <value nick="sln" value="1"/>
   </enum>
+  <enum id="io.github.tomsliikee.Anvil.Density">
+    <value nick="comfortable" value="0"/>
+    <value nick="compact" value="1"/>
+  </enum>
   <schema id="io.github.tomsliikee.Anvil" path="/io/github/tomsliikee/Anvil/">
     <key name="color-scheme" enum="io.github.tomsliikee.Anvil.ColorScheme"><default>"system"</default><summary>Light, dark, or follow the system</summary></key>
     <key name="language" enum="io.github.tomsliikee.Anvil.Language"><default>"system"</default><summary>Interface language</summary></key>
@@ -22,6 +26,8 @@
     <key name="window-maximized" type="b"><default>false</default><summary>Window maximised</summary></key>
     <key name="side-width" type="i"><default>320</default><summary>Width of the Solution Explorer column</summary></key>
     <key name="bottom-height" type="i"><default>240</default><summary>Height of the bottom panel</summary></key>
+    <key name="density" enum="io.github.tomsliikee.Anvil.Density"><default>"comfortable"</default><summary>Spacing of panels, lists and tabs</summary></key>
+    <key name="dock-layout" type="s"><default>""</default><summary>Last window layout (JSON), for solutions without their own</summary></key>
     <key name="recent-solutions" type="as"><default>[]</default><summary>Recently opened solutions, newest first</summary></key>
     <key name="new-solution-format" enum="io.github.tomsliikee.Anvil.SolutionFormat"><default>"slnx"</default><summary>Format of new solutions</summary></key>
     <key name="word-wrap" type="b"><default>false</default><summary>Wrap long lines</summary></key>

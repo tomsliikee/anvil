@@ -1,5 +1,6 @@
 /* Rules of Anvil. Values come only from var(--im-…) (insights-mono/tokens.json
-   through anvil/build.rs). Durations: 120 ms hover, 200 ms state. */
+   through anvil/build.rs). Durations: anvil/src/motion.rs (150 ms hover and popovers, 200 ms
+   state), one ease-out curve; a test keeps them in step. */
 
 window.anvil {
   font-family: Inter, sans-serif;
@@ -116,7 +117,7 @@ textview.output > text {
   color: var(--im-ink2);
   font-weight: 500;
   font-size: 12.5px;
-  transition: background 120ms ease-out, color 120ms ease-out;
+  transition: background 150ms ease-out, color 150ms ease-out;
 }
 
 .panel-tabs button:hover {
@@ -148,7 +149,7 @@ textview.output > text {
   background: transparent;
   box-shadow: none;
   color: var(--im-ink);
-  transition: background 120ms ease-out;
+  transition: background 150ms ease-out;
 }
 
 .run-bar button:hover {
@@ -336,7 +337,7 @@ listview.tree > row {
   min-height: 26px;
   padding: 0 6px;
   border-radius: 8px;
-  transition: background 120ms ease-out;
+  transition: background 150ms ease-out;
 }
 
 listview.tree > row:hover {
@@ -756,4 +757,101 @@ list.breakpoints dropdown > button {
 /* Call Stack: the frame the windows show. */
 list.results > row.current-frame label {
   font-weight: 700;
+}
+
+/* The work area keeps 12 px from the window's edges (8 px compact). */
+paned.workspace {
+  margin: 0 12px;
+}
+
+window.density-compact paned.workspace {
+  margin: 0 8px;
+}
+
+/* Dock areas: the panel tab being dragged over an area tints it; an
+   empty area shows only while a tab is dragged. */
+.dock-area:drop(active) {
+  background: color-mix(in srgb, var(--im-fill) 60%, var(--im-card));
+}
+
+.dock-placeholder {
+  padding: 24px;
+}
+
+.panel-header button.panel-hide {
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0;
+  border-radius: var(--im-radius-pill);
+  background: transparent;
+  color: var(--im-ink3);
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+
+.panel-header button.panel-hide:hover {
+  background: var(--im-fill);
+  color: var(--im-ink);
+}
+
+/* Ctrl+Tab switcher. */
+.tab-switcher {
+  padding: 12px;
+}
+
+/* Popovers fade in like the panels. */
+popover > contents {
+  animation: anvil-pop 150ms ease-out;
+}
+
+@keyframes anvil-pop {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Compact density: the same layout with less air. */
+window.density-compact .panel-header {
+  padding: 4px 8px 2px 10px;
+  min-height: 30px;
+}
+
+window.density-compact .panel-tabs button,
+window.density-compact .filter-bar menubutton > button,
+window.density-compact .filter-bar searchentry,
+window.density-compact .filter-toggle {
+  min-height: 24px;
+  padding-left: 9px;
+  padding-right: 9px;
+}
+
+window.density-compact tabbar.editor-tabs > revealer > box {
+  padding: 4px 6px 0 6px;
+}
+
+window.density-compact tabbar.editor-tabs tab {
+  min-height: 24px;
+}
+
+window.density-compact listview.tree > row {
+  min-height: 22px;
+}
+
+window.density-compact columnview.diagnostics > listview > row > cell,
+window.density-compact columnview.vars > listview > row > cell {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+window.density-compact list.results > row {
+  padding: 3px 10px;
+}
+
+window.density-compact .statusbar {
+  padding: 1px 12px 3px 12px;
+}
+
+window.density-compact paned.split > separator,
+window.density-compact paned.split > separator.wide {
+  min-width: 6px;
+  min-height: 6px;
 }
