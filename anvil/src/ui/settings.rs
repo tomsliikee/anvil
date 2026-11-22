@@ -52,6 +52,7 @@ fn editor_page() -> adw::PreferencesPage {
     let g = adw::PreferencesGroup::new();
     g.add(&switch(&tr("Word wrap"), "word-wrap"));
     g.add(&switch(&tr("View white space"), "show-whitespace"));
+    g.add(&switch(&tr("Format document on save"), "format-on-save"));
     g.add(&switch(&tr("Show StyleCop rules in the Error List"), "show-stylecop"));
     // CodeLens and Git blame have keys but no view yet; their switches
     // come back with the views.

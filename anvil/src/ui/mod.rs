@@ -11,6 +11,7 @@ pub mod errorlist;
 pub mod explorer;
 pub mod find;
 pub mod git;
+pub mod ide;
 pub mod lsp;
 pub mod menus;
 pub mod newitem;
