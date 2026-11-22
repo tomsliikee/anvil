@@ -1737,10 +1737,6 @@ msgstr "Neue Tastenkombination drücken…"
 msgid "Settings"
 msgstr "Einstellungen"
 
-#: anvil/src/ui/start.rs:43
-msgid "Write it here. Hand it in anywhere."
-msgstr "Hier schreiben. Überall abgeben."
-
 #: anvil/src/ui/start.rs:47
 msgid "Open recent"
 msgstr "Zuletzt geöffnet"

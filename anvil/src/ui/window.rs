@@ -231,6 +231,7 @@ pub fn build(application: &adw::Application) -> Rc<App> {
     theme_button.set_tooltip_text(Some(&tr("Light or Dark")));
     header.pack_end(&theme_button);
     header.pack_end(&toolbar.ai);
+    header.pack_end(&crate::ui::palette_search::header_button());
     adw::StyleManager::default().connect_dark_notify(glib::clone!(
         #[weak]
         theme_button,

@@ -244,8 +244,29 @@ fn top_menus() -> Vec<(String, Vec<Item>)> {
     ]
 }
 
+/// Where each command sits in the menu bar ("Edit › Advanced"), for
+/// Feature Search; commands that are not in a menu are left out.
+pub fn menu_paths() -> std::collections::HashMap<&'static str, String> {
+    fn walk(items: &[Item], path: &str, out: &mut std::collections::HashMap<&'static str, String>) {
+        for it in items {
+            match it {
+                Item::Command(id) => {
+                    out.entry(*id).or_insert_with(|| path.to_owned());
+                }
+                Item::Submenu(label, sub) => walk(sub, &format!("{path} › {label}"), out),
+                _ => {}
+            }
+        }
+    }
+    let mut out = std::collections::HashMap::new();
+    for (label, items) in top_menus() {
+        walk(&items, &label.replace('_', ""), &mut out);
+    }
+    out
+}
+
 thread_local! {
-    static MENUBAR: RefCell<Option<gtk::PopoverMenuBar>> = const { RefCell::new(None) };
+    static MENUBAR:RefCell<Option<gtk::PopoverMenuBar>> = const { RefCell::new(None) };
 }
 
 pub fn menubar() -> gtk::PopoverMenuBar {

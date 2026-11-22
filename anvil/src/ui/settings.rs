@@ -36,7 +36,7 @@ fn choice(title: &str, key: &'static str, nicks: &'static [&'static str], labels
 }
 
 fn general_page() -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder().title(tr("General")).icon_name("preferences-system-symbolic").build();
+    let page = adw::PreferencesPage::builder().title(tr("General")).name("general").icon_name("preferences-system-symbolic").build();
     let g = adw::PreferencesGroup::new();
     let language = choice(&tr("Language"), "language", &["system", "en", "de"], &[tr("System"), "English".into(), "Deutsch".into()]);
     language.set_subtitle(&tr("Takes effect after a restart."));
@@ -48,7 +48,7 @@ fn general_page() -> adw::PreferencesPage {
 }
 
 fn editor_page() -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder().title(tr("Editor")).icon_name("accessories-text-editor-symbolic").build();
+    let page = adw::PreferencesPage::builder().title(tr("Editor")).name("editor").icon_name("accessories-text-editor-symbolic").build();
     let g = adw::PreferencesGroup::new();
     g.add(&switch(&tr("Word wrap"), "word-wrap"));
     g.add(&switch(&tr("View white space"), "show-whitespace"));
@@ -60,7 +60,7 @@ fn editor_page() -> adw::PreferencesPage {
 }
 
 fn ai_page() -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder().title(tr("AI")).icon_name("starred-symbolic").build();
+    let page = adw::PreferencesPage::builder().title(tr("AI")).name("ai").icon_name("starred-symbolic").build();
     let g = adw::PreferencesGroup::new();
     g.set_description(Some(&tr("Local models through Ollama only. Nothing leaves this machine. Both parts are off by default; the master switch turns everything off for exams.")));
     g.add(&switch(&tr("AI features"), "ai-enabled"));
@@ -79,7 +79,7 @@ fn ai_page() -> adw::PreferencesPage {
 }
 
 fn tools_page() -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder().title(tr("Tools")).icon_name("applications-engineering-symbolic").build();
+    let page = adw::PreferencesPage::builder().title(tr("Tools")).name("tools").icon_name("applications-engineering-symbolic").build();
     let g = adw::PreferencesGroup::new();
     let home = crate::host::home();
     let roslyn = adw::ActionRow::builder().title(tr("C# language server (Roslyn)")).subtitle(if anvil_lsp::roslyn::is_installed(&home, anvil_lsp::roslyn::VERSION) { trf("{} installed", &[anvil_lsp::roslyn::VERSION]) } else { tr("Not installed; downloaded on first use") }).build();
@@ -259,6 +259,8 @@ pub fn show(page: Option<&str>) {
     dialog.add(&tools_page());
     if page == Some("keyboard") {
         dialog.set_visible_page(&kb);
+    } else if let Some(name) = page {
+        dialog.set_visible_page_name(name);
     }
     dialog.present(Some(&app.window));
 }

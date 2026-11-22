@@ -70,6 +70,10 @@ pub fn show(preselect: Option<ItemTemplate>) {
     row.append(&gtk::Label::new(Some(&tr("Name:"))));
     row.append(&name);
     b.append(&row);
+    // Problems with the name show here while typing, instead of an error
+    // after Add.
+    let problem = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(["hint", "inline-error"]).visible(false).build();
+    b.append(&problem);
     let rel = app.solution.borrow().as_ref().map(|s| dir.strip_prefix(&s.dir).unwrap_or(&dir).display().to_string()).unwrap_or_default();
     // The folder is worth a line only below the project's own folder.
     let body = (rel != project && !rel.is_empty()).then_some(rel);
@@ -79,6 +83,26 @@ pub fn show(preselect: Option<ItemTemplate>) {
     dialog.set_response_appearance("add", adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some("add"));
     dialog.set_close_response("cancel");
+    let check = glib::clone!(
+        #[weak]
+        dialog,
+        #[weak]
+        list,
+        #[weak]
+        problem,
+        #[strong]
+        dir,
+        move |text: &str| {
+            let t = list.selected_row().map(|r| ItemTemplate::ALL[r.index() as usize]).unwrap_or(initial);
+            let msg = item_problem(&dir, t, text);
+            problem.set_label(msg.as_deref().unwrap_or(""));
+            problem.set_visible(msg.is_some());
+            dialog.set_response_enabled("add", msg.is_none());
+        }
+    );
+    let c = check.clone();
+    name.connect_changed(move |e| c(&e.text()));
+    check(&name.text());
     glib::idle_add_local_once(glib::clone!(
         #[weak]
         name,
@@ -94,13 +118,32 @@ pub fn show(preselect: Option<ItemTemplate>) {
             return;
         }
         let t = list.selected_row().map(|r| ItemTemplate::ALL[r.index() as usize]).unwrap_or(initial);
-        let mut file_name = name.text().trim().to_owned();
-        let (_, ext) = t.default_name();
-        if !ext.is_empty() && !file_name.to_lowercase().ends_with(ext) {
-            file_name.push_str(ext);
-        }
+        let file_name = final_name(t, &name.text());
         add_item(&project, &dir, t, &file_name);
     });
+}
+
+/// The file name the dialog would write: the template's extension added.
+fn final_name(t: ItemTemplate, text: &str) -> String {
+    let mut file_name = text.trim().to_owned();
+    let (_, ext) = t.default_name();
+    if !ext.is_empty() && !file_name.to_lowercase().ends_with(ext) {
+        file_name.push_str(ext);
+    }
+    file_name
+}
+
+/// Why `text` cannot be the new item's name, if it cannot.
+fn item_problem(dir: &Path, t: ItemTemplate, text: &str) -> Option<String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Some(tr("Enter a name."));
+    }
+    if text.contains(['/', '\\']) || text.starts_with('.') && text.len() == 1 {
+        return Some(tr("The name cannot contain / or \\."));
+    }
+    let file_name = final_name(t, text);
+    dir.join(&file_name).exists().then(|| trf("A file with the name '{}' already exists.", &[&file_name]))
 }
 
 /// Writes the item and opens it. Returns the new file.
