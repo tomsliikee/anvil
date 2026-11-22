@@ -50,7 +50,8 @@ impl StartPage {
         // resource path (icons/) to it, so dev builds find it too.
         let brand = gtk::Box::new(gtk::Orientation::Vertical, 12);
         brand.set_halign(gtk::Align::Start);
-        let logo = gtk::Image::from_icon_name(crate::APP_ID);
+        // The bare anvil, drawn in the text colour (black, white in dark).
+        let logo = gtk::Image::from_icon_name(&format!("{}-symbolic", crate::APP_ID));
         logo.set_pixel_size(96);
         logo.set_halign(gtk::Align::Start);
         brand.append(&logo);

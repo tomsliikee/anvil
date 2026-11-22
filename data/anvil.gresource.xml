@@ -3,5 +3,6 @@
   <gresource prefix="/io/github/tomsliikee/Anvil">
     <file>style.css</file>
     <file preprocess="xml-stripblanks">icons/scalable/apps/io.github.tomsliikee.Anvil.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/apps/io.github.tomsliikee.Anvil-symbolic.svg</file>
   </gresource>
 </gresources>
