@@ -3,6 +3,7 @@
 //! host) and hands the pipes to [`client::Client::start`].
 
 pub mod client;
+pub mod navigation;
 pub mod position;
 pub mod roslyn;
 pub mod rpc;

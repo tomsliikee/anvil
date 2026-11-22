@@ -21,6 +21,8 @@ pub enum Error {
     Closed,
     /// The answer did not have the expected shape.
     Decode(String),
+    /// No answer in time; the request was cancelled.
+    Timeout,
 }
 
 impl std::fmt::Display for Error {
@@ -29,6 +31,7 @@ impl std::fmt::Display for Error {
             Error::Rpc { code, message } => write!(f, "{message} ({code})"),
             Error::Closed => f.write_str("the language server stopped"),
             Error::Decode(e) => write!(f, "unexpected reply: {e}"),
+            Error::Timeout => f.write_str("the language server did not answer in time"),
         }
     }
 }
@@ -154,6 +157,13 @@ impl Client {
     pub async fn request_raw(&self, method: &str, params: Value) -> Result<Value, Error> {
         let (_, rx) = self.send_request(method, params);
         rx.await.unwrap_or(Err(Error::Closed))
+    }
+
+    /// Gives up on a request the caller stopped waiting for (a timeout):
+    /// its pending slot is freed and the server gets `$/cancelRequest`.
+    pub fn abandon(&self, id: i64) {
+        self.pending.lock().expect("pending lock").remove(&id);
+        self.cancel(id);
     }
 
     /// A typed request.
