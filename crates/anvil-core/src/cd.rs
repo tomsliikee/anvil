@@ -369,6 +369,11 @@ impl Diagram {
         let item = format!("<Property Name=\"{}\" />", crate::xml::escape_attr(member));
         match self.doc.child(id, el) {
             Some(list) => {
+                // Already shown as a line: a second entry would make VS
+                // draw it twice and grow the file on every save.
+                if self.doc.children(list).any(|p| self.doc.attr(p, "Name") == Some(member)) {
+                    return;
+                }
                 let last = self.doc.children(list).last();
                 let e = self.doc.insert_child(list, last, &item);
                 self.apply(&[e]);
@@ -504,6 +509,9 @@ mod tests {
         assert_eq!(d.shapes()[0].kind, ShapeKind::Comment);
         d.move_shape("A.B", 2.25, 2.0);
         assert!(String::from_utf8(d.to_bytes()).unwrap().contains("<Future Thing=\"1\" />"));
+        // A second Show as Association on the same member adds nothing.
+        d.show_as_association("A.B", "Next", false);
+        assert_eq!(String::from_utf8(d.to_bytes()).unwrap().matches("<Property Name=\"Next\" />").count(), 1);
         d.show_as_member("A.B", "Next");
         let s = String::from_utf8(d.to_bytes()).unwrap();
         assert!(!s.contains("ShowAsAssociation") && !s.contains("AssociationLine"), "{s}");

@@ -44,8 +44,9 @@ impl StartPage {
         outer.set_margin_bottom(40);
         outer.set_margin_start(40);
         outer.set_margin_end(40);
-        outer.set_halign(gtk::Align::Center);
-        outer.set_width_request(760);
+        // At most 760 wide (840 with the margins), but never a minimum: the start page shares a
+        // stack with the editors, and a stack is as wide as its widest page,
+        // so a fixed width here clipped the editors and the bottom panel.
         // The logo comes from the icon theme; the application adds its
         // resource path (icons/) to it, so dev builds find it too.
         let brand = gtk::Box::new(gtk::Orientation::Vertical, 12);
@@ -75,7 +76,9 @@ impl StartPage {
         cols.append(&left);
         cols.append(&right);
         outer.append(&cols);
-        let widget = gtk::ScrolledWindow::builder().child(&outer).hscrollbar_policy(gtk::PolicyType::Never).build();
+        let clamp = adw::Clamp::builder().maximum_size(840).tightening_threshold(840).child(&outer).build();
+        // Scrolls sideways when narrow rather than asking the stack for width.
+        let widget = gtk::ScrolledWindow::builder().child(&clamp).hscrollbar_policy(gtk::PolicyType::Automatic).build();
         StartPage { widget, recent, empty }
     }
 
