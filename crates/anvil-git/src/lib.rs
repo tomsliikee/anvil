@@ -3,6 +3,7 @@
 //! Git Repository windows, and parsers for git's machine-readable output.
 
 pub mod blame;
+pub mod diff;
 pub mod log;
 pub mod ops;
 pub mod status;
