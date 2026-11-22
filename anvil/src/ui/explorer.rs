@@ -426,6 +426,16 @@ impl Explorer {
             let app = crate::ui::window::app();
             app.explorer.list.grab_focus();
         });
+        // After the tab is registered: the first tab of an empty view is
+        // selected while it is appended, before the tabs know its file.
+        crate::ui::window::app().tabs.view.connect_selected_page_notify(|_| {
+            glib::idle_add_local_once(|| {
+                let app = crate::ui::window::app();
+                if let Some(p) = app.tabs.current_path() {
+                    app.explorer.reveal(&p);
+                }
+            });
+        });
         self.track.connect_toggled(|t| {
             if t.is_active()
                 && let Some(p) = crate::ui::window::app().tabs.current_path()
@@ -615,6 +625,11 @@ impl Explorer {
         *self.answer.borrow_mut() = Some(Box::new(done));
         self.prompt.set_reveal_child(true);
         default.grab_focus();
+    }
+
+    /// Moves the focus to the tree, which ends an unchanged inline rename.
+    pub fn list_grab_focus(&self) {
+        self.list.grab_focus();
     }
 
     fn rename_entry(&self, path: &Path) -> Option<gtk::Entry> {
@@ -919,7 +934,7 @@ fn run_move(from: &Path, to: &Path) {
 
 /// A drag and drop: moves, then offers (default no) to change the
 /// namespaces of moved `.cs` files when they went to another project.
-fn move_by_user(from: PathBuf, to: PathBuf) {
+pub fn move_by_user(from: PathBuf, to: PathBuf) {
     let (src_project, dest) = {
         let app = crate::ui::window::app();
         let sol = app.solution.borrow();

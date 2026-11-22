@@ -94,6 +94,15 @@ pub fn run(dir: PathBuf) {
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
+    // ANVIL_SHOTS=explorer: the Solution Explorer on a solution with
+    // Shop.App, Shop.Core (Models/Order.cs) and Shop.Data.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("explorer")
+        && let Ok(open) = std::env::var("ANVIL_OPEN")
+    {
+        steps.extend(explorer_steps(PathBuf::from(open)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
     if let Ok(open) = std::env::var("ANVIL_OPEN") {
         let sol = PathBuf::from(&open);
         let project_dir = sol.parent().map(|d| d.join(sol.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())).unwrap_or_default();
@@ -217,6 +226,45 @@ pub fn run(dir: PathBuf) {
 
 /// Four files opened as preview tabs one after another (the order that
 /// crashed), the diagram, and the dialogs, light and dark.
+fn explorer_steps(sol: PathBuf) -> Vec<Step> {
+    let dir = sol.parent().map(Path::to_path_buf).unwrap_or_default();
+    let order = dir.join("Shop.Core/Models/Order.cs");
+    let (from, to) = (dir.join("Shop.Core/Models/Product.cs"), dir.join("Shop.Data/Product.cs"));
+    let settings = (dir.join("Shop.App/appsettings.json"), dir.join("Shop.App/Config/appsettings.json"));
+    let explorer = || crate::ui::window::app().explorer.clone();
+    vec![
+        act(move || window::open_path(&sol)),
+        Step::Wait(1500),
+        // Track Active Item opens Shop.Core and Models for the tab.
+        act(move || {
+            crate::ui::window::app().tabs.open(&order, false);
+        }),
+        Step::Wait(600),
+        Step::Shot("explorer-track"),
+        act(move || explorer().search.set_text("repo")),
+        Step::Wait(700),
+        Step::Shot("explorer-filter"),
+        act(move || explorer().search.set_text("")),
+        Step::Wait(700),
+        act(|| crate::ui::explorer::rename_selected()),
+        Step::Wait(400),
+        Step::Shot("explorer-rename"),
+        act(|| crate::ui::window::app().explorer.list_grab_focus()),
+        Step::Wait(300),
+        act(move || {
+            let _ = crate::ui::explorer::move_path(&settings.0, &settings.1);
+        }),
+        Step::Wait(400),
+        act(move || crate::ui::explorer::move_by_user(from.clone(), to.clone())),
+        Step::Wait(600),
+        Step::Shot("explorer-move"),
+        Step::Theme(adw::ColorScheme::ForceDark),
+        Step::Wait(600),
+        Step::Shot("explorer-move-dark"),
+        Step::Theme(adw::ColorScheme::ForceLight),
+    ]
+}
+
 fn ui_steps(sol: PathBuf) -> Vec<Step> {
     let project_dir = sol.parent().map(|d| d.join(sol.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())).unwrap_or_default();
     let files = ["Program.cs", "Person.cs", "ListNode.cs", "DoublyLinkedPersonList.cs"].map(|f| project_dir.join(f));
