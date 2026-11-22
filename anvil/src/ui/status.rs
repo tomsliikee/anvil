@@ -37,6 +37,10 @@ impl StatusBar {
         self.message.set_label(text);
     }
 
+    pub fn message(&self) -> String {
+        self.message.label().to_string()
+    }
+
     /// A message that clears itself after a few seconds.
     pub fn flash(&self, text: &str) {
         self.message.set_label(text);

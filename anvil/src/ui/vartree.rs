@@ -166,6 +166,17 @@ impl VarTree {
         self.store.remove_all();
     }
 
+    /// The top-level rows as `name = value` (the screenshot run's log).
+    pub fn roots(&self) -> Vec<String> {
+        (0..self.store.n_items())
+            .filter_map(|i| self.store.item(i).and_downcast::<glib::BoxedAnyObject>())
+            .map(|b| {
+                let it = b.borrow::<Item>();
+                format!("{} = {}", it.var.name, it.shown)
+            })
+            .collect()
+    }
+
     /// The top-level row's name under the selection (Watch: the
     /// expression).
     pub fn selected_root(&self) -> Option<String> {

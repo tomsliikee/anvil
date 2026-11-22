@@ -200,8 +200,16 @@ pub fn tabbed_panel(stack: &adw::ViewStack, extra: Option<&gtk::Widget>) -> gtk:
             }
         }
     );
+    // `pages()` hands out a model only as long as someone holds it; the
+    // handler keeps it alive, or pages added and removed later (the
+    // debugger's windows) would leave stale tabs behind.
     let r = rebuild.clone();
-    stack.pages().connect_items_changed(move |_, _, _, _| r());
+    let pages = stack.pages();
+    let keep = pages.clone();
+    pages.connect_items_changed(move |_, _, _, _| {
+        let _ = &keep;
+        r();
+    });
     let r = rebuild.clone();
     stack.connect_visible_child_name_notify(move |_| r());
     rebuild();
@@ -612,18 +620,31 @@ pub fn refresh_startup_dropdown() {
     app.toolbar.start_label.set_label(&startup_project_name().unwrap_or_else(|| tr("Start")));
 }
 
-/// The startup project: the user's choice, else VS' default (the first).
+/// The startup project: the user's choice, else the first project that
+/// can run (VS would take the first even when it is a class library).
 pub fn startup_project_name() -> Option<String> {
     let app = crate::ui::window::app();
     let sol = app.solution.borrow();
     let sol = sol.as_ref()?;
-    app.session.borrow().startup_project.clone().filter(|n| sol.project_named(n).is_some()).or_else(|| sol.first_project().map(|p| p.name.clone()))
+    app.session.borrow().startup_project.clone().filter(|n| sol.project_named(n).is_some()).or_else(|| sol.default_startup().map(|p| p.name.clone()))
 }
 
 pub fn set_startup_project(name: &str) {
     let app = crate::ui::window::app();
     app.session.borrow_mut().startup_project = Some(name.to_owned());
-    app.toolbar.start_label.set_label(name);
+    // The dropdown follows a choice made in the Solution Explorer; while
+    // debugging, Start keeps saying Continue.
+    let index = app.solution.borrow().as_ref().and_then(|s| s.projects.iter().position(|p| p.name == name));
+    if let Some(i) = index
+        && app.toolbar.startup.selected() != i as u32
+    {
+        app.toolbar.filling_startup.set(true);
+        app.toolbar.startup.set_selected(i as u32);
+        app.toolbar.filling_startup.set(false);
+    }
+    if !app.debugger.is_active() {
+        app.toolbar.start_label.set_label(name);
+    }
     save_session();
     app.explorer.reload();
     warn_startup_mismatch();

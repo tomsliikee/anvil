@@ -167,7 +167,14 @@ pub fn run_without_debugging() {
         glib::spawn_future_local(async move {
             // The built program itself, in its output folder with the
             // launchSettings arguments and environment, as VS runs it.
-            let dll = built_program(&p).await;
+            let dll = match built_program(&p).await {
+                Ok(dll) => dll,
+                Err(e) => {
+                    crate::ui::window::app().status.set_message(&e);
+                    window::toast(&e);
+                    return;
+                }
+            };
             let mut cmd = Command::new("dotnet").arg(dll.to_string_lossy()).args(launch_args(&p));
             for (k, v) in launch_env(&p) {
                 cmd = cmd.env(k, v);
@@ -179,19 +186,37 @@ pub fn run_without_debugging() {
     });
 }
 
-/// The program MSBuild built (`TargetPath`), or VS' default location
-/// `bin/Debug/<tfm>/<AssemblyName>.dll`.
-pub async fn built_program(p: &anvil_core::solution::Project) -> std::path::PathBuf {
-    let cmd = Command::dotnet().arg("msbuild").arg(p.path.to_string_lossy()).args(["-getProperty:TargetPath", "-nologo"]).cwd(&p.dir);
-    if let Ok(out) = host::run(cmd, None).await
-        && out.ok()
-        && let Some(path) = anvil_dap::launch::parse_target_path(&out.stdout_text())
+/// The program MSBuild built (`TargetPath`, of the first framework when
+/// the project targets several, as VS starts), or VS' default location
+/// `bin/Debug/<tfm>/<AssemblyName>.dll`. A class library is refused with
+/// VS' reason instead of letting `dotnet` fail on it.
+pub async fn built_program(p: &anvil_core::solution::Project) -> Result<PathBuf, String> {
+    let query = |framework: Option<&str>| {
+        let mut cmd = Command::dotnet().arg("msbuild").arg(p.path.to_string_lossy()).args(anvil_dap::launch::PROGRAM_PROPERTIES.iter().map(|k| format!("-getProperty:{k}"))).arg("-nologo").cwd(&p.dir);
+        if let Some(f) = framework {
+            cmd = cmd.arg(format!("-property:TargetFramework={f}"));
+        }
+        async move { host::run(cmd, None).await.ok().filter(host::Output::ok).and_then(|o| anvil_dap::launch::parse_program_info(&o.stdout_text())) }
+    };
+    let mut info = query(None).await;
+    if let Some(i) = &info
+        && i.target_path.is_none()
+        && let Some(first) = i.frameworks.first().cloned()
     {
-        return path;
+        info = query(Some(&first)).await.or(info);
+    }
+    if let Some(i) = &info
+        && !i.output_type.is_empty()
+        && !i.is_startable()
+    {
+        return Err(trf("{} is a class library ({}) and cannot be started directly. Choose a console app as startup project (the list next to Start, or Set as Startup Project in the Solution Explorer).", &[&p.name, &i.output_type]));
+    }
+    if let Some(path) = info.and_then(|i| i.target_path) {
+        return Ok(path);
     }
     let tfm = p.csproj.as_ref().and_then(|c| c.target_framework()).unwrap_or_else(|| "net10.0".into());
     let assembly = p.csproj.as_ref().and_then(|c| c.property("AssemblyName")).unwrap_or_else(|| p.name.clone());
-    anvil_dap::launch::output_dll(&p.dir, &assembly, &tfm)
+    Ok(anvil_dap::launch::output_dll(&p.dir, &assembly, &tfm))
 }
 
 /// The environment variables VS would set (launchSettings.json).
