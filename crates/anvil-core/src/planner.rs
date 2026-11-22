@@ -10,7 +10,7 @@
 use crate::csharp::{Access, FileStructure, Member, MemberKind, TypeDecl, TypeKind};
 use crate::edit::TextEdit;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NewMember {
     Method,
     Property,

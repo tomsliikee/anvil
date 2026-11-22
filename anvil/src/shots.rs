@@ -239,6 +239,22 @@ fn ui_steps(sol: PathBuf) -> Vec<Step> {
         }),
         Step::Wait(1200),
         Step::Shot("ui-diagram-light"),
+        // Frame cost of a card drag, then two associations and Layout
+        // Diagram so routed lines show (on the copy being shot only).
+        act(|| {
+            if let Some(crate::ui::editor::Doc::Diagram(d)) = crate::ui::window::app().tabs.current().as_deref() {
+                if let Some((cold, mean, worst)) = d.canvas.measure_drag(120) {
+                    println!("anvil: designer drag frame: first {cold:.2} ms, mean {mean:.2} ms, worst {worst:.2} ms (120 frames)");
+                }
+                d.edit_cd(|cd| {
+                    cd.show_as_association("doublyLinkedList.ListNode", "P", false);
+                    cd.show_as_association("doublyLinkedList.Person", "Sex", false);
+                });
+                d.layout();
+            }
+        }),
+        Step::Wait(800),
+        Step::Shot("ui-diagram-routed-light"),
         act(|| {
             let app = crate::ui::window::app();
             app.tabs.view.set_selected_page(&app.tabs.view.nth_page(0));
