@@ -356,6 +356,25 @@ listview.tree label.name {
   font-size: 13px;
 }
 
+/* Solution Explorer: a drop target row, the inline rename, the question
+   under the search field. */
+listview.explorer treeexpander:drop(active) {
+  background: var(--im-fill);
+  border-radius: 8px;
+}
+
+listview.explorer entry.rename {
+  min-height: 22px;
+  padding: 0 6px;
+}
+
+.explorer-prompt {
+  margin: 0 6px 6px 6px;
+  padding: 10px 12px;
+  border-radius: var(--im-radius-card);
+  background: var(--im-fill);
+}
+
 .tree-icon {
   color: var(--im-ink2);
 }
