@@ -490,6 +490,23 @@ textview.diff > text {
   color: var(--im-ink);
 }
 
+/* The running job: spinner, text, clock, cancel; no fill of its own. */
+.statusbar .job {
+  color: var(--im-ink);
+}
+
+.statusbar .job-time {
+  color: var(--im-ink3);
+}
+
+.statusbar .job-cancel {
+  min-height: 16px;
+  min-width: 16px;
+  padding: 0;
+  border-radius: var(--im-radius-pill);
+  color: var(--im-ink2);
+}
+
 /* Floating things: one shadow each. */
 .popup,
 popover.anvil > contents {

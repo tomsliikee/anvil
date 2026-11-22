@@ -3,6 +3,7 @@
 //! the hand-in ZIP. Nothing here touches GTK or a process, so all of it is
 //! tested on the host with `cargo test -p anvil-core`.
 
+pub mod build;
 pub mod diagnostics;
 pub mod diff;
 pub mod edit;

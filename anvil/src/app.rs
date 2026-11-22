@@ -26,9 +26,13 @@ pub fn build() -> adw::Application {
             window.present();
             return;
         }
+        ui::jobs::trace("activate");
         let win = ui::window::build(app);
+        ui::jobs::trace("window built");
         win.window.present();
         crate::frame_log::watch_window(&win.window);
+        ui::jobs::trace_first_frame(&win.window);
+        ui::jobs::watch_main_thread();
         if let Some(dir) = shots::requested() {
             shots::run(dir);
         } else if let Ok(path) = std::env::var("ANVIL_OPEN") {

@@ -778,6 +778,9 @@ impl Debugger {
         self.starting.set(on);
         if on {
             self.cancel_start.set(false);
+            crate::ui::jobs::start("debug", &tr("Starting the debugger…"));
+        } else {
+            crate::ui::jobs::finish("debug");
         }
         crate::ui::window::app().toolbar.set_busy(on);
         self.update_controls();

@@ -2542,3 +2542,60 @@ msgstr "KI: Die Ollama-Adresse muss auf diesem Computer liegen (wie {}), nicht {
 
 msgid "AI: {} took {} s for a suggestion. A smaller model (Settings → AI) answers faster."
 msgstr "KI: {} brauchte {} s für einen Vorschlag. Ein kleineres Modell (Einstellungen → KI) antwortet schneller."
+
+msgid "Show"
+msgstr "Anzeigen"
+
+msgid "Building {}…"
+msgstr "{} wird erstellt…"
+
+msgid "Rebuilding {}…"
+msgstr "{} wird neu erstellt…"
+
+msgid "Cleaning {}…"
+msgstr "{} wird bereinigt…"
+
+msgid "{} of {}"
+msgstr "{} von {}"
+
+msgid "The package assets are out of date; building again with restore."
+msgstr "Die Paketdaten sind veraltet; es wird mit Wiederherstellung erneut erstellt."
+
+msgid "Clean succeeded"
+msgstr "Bereinigen erfolgreich"
+
+msgid "Clean failed"
+msgstr "Bereinigen fehlgeschlagen"
+
+msgid "Build succeeded – {}"
+msgstr "Erstellen erfolgreich – {}"
+
+msgid "Build failed – {}"
+msgstr "Erstellen fehlgeschlagen – {}"
+
+msgid "Running {}…"
+msgstr "{} wird ausgeführt…"
+
+msgid "Started {}:"
+msgstr "{} gestartet:"
+
+msgid "{} exited with code {}"
+msgstr "{} wurde mit Code {} beendet"
+
+msgid "{} was stopped"
+msgstr "{} wurde angehalten"
+
+msgid "Starting the language server…"
+msgstr "Sprachserver wird gestartet…"
+
+msgid "Restore failed for {}"
+msgstr "Wiederherstellung für {} fehlgeschlagen"
+
+msgid "Running tests…"
+msgstr "Tests werden ausgeführt…"
+
+msgid "Tests: {} passed, {} failed"
+msgstr "Tests: {} bestanden, {} fehlgeschlagen"
+
+msgid "Starting the debugger…"
+msgstr "Debugger wird gestartet…"
