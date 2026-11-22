@@ -1649,6 +1649,10 @@ msgid "View white space"
 msgstr "Leerraum anzeigen"
 
 #: anvil/src/ui/settings.rs:55
+msgid "Smooth scrolling and caret"
+msgstr "Sanftes Scrollen und Cursor"
+
+#: anvil/src/ui/settings.rs:55
 msgid "Show StyleCop rules in the Error List"
 msgstr "StyleCop-Regeln in der Fehlerliste anzeigen"
 

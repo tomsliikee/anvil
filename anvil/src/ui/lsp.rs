@@ -73,6 +73,7 @@ impl Lsp {
     }
 
     fn flush_changes(&self) {
+        let _s = crate::frame_log::span("lsp didChange");
         if let Some(id) = self.flush_source.borrow_mut().take() {
             id.remove();
         }
@@ -467,10 +468,12 @@ fn set_diagnostics(path: &Path, source: &str, list: Vec<lt::Diagnostic>) {
     if let Some(doc) = app.tabs.code_doc(path) {
         apply_squiggles(&doc);
     }
+    let _s = crate::frame_log::span("error list");
     app.errors.set_intellisense(app.lsp.all_diagnostics());
 }
 
 fn apply_squiggles(doc: &CodeDoc) {
+    let _s = crate::frame_log::span("squiggles");
     let app = crate::ui::window::app();
     let all: Vec<lt::Diagnostic> = app.lsp.diags.borrow().get(&doc.path()).map(|m| m.values().flatten().cloned().collect()).unwrap_or_default();
     let (s, e) = doc.buffer.bounds();
@@ -479,6 +482,7 @@ fn apply_squiggles(doc: &CodeDoc) {
     }
     let text = doc.text();
     let at = doc.byte_iters(&text);
+    let lines = anvil_lsp::position::Lines::new(&text);
     for d in &all {
         let tag = match d.severity {
             Some(lt::DiagnosticSeverity::ERROR) => "diag-error",
@@ -486,7 +490,7 @@ fn apply_squiggles(doc: &CodeDoc) {
             Some(lt::DiagnosticSeverity::HINT) => continue,
             _ => "diag-info",
         };
-        let (a, mut b) = (to_offset(&text, d.range.start), to_offset(&text, d.range.end));
+        let (a, mut b) = (lines.offset(&text, d.range.start), lines.offset(&text, d.range.end));
         if a == b {
             // Zero width: one whole character, never half an umlaut.
             b = anvil_core::text::next_char_end(&text, a);
@@ -521,6 +525,8 @@ async fn pull_diagnostics(path: PathBuf) {
     let Some(client) = app.lsp.client() else { return };
     let Some(doc) = app.tabs.code_doc(&path) else { return };
     let version = doc.version.get();
+    // The text the server answers for (client() sent every change first).
+    let asked = doc.text();
     let ids: Vec<Option<String>> = {
         let r = app.lsp.running.borrow();
         let ids = r.as_ref().map(|r| r.identifiers.clone()).unwrap_or_default();
@@ -532,13 +538,20 @@ async fn pull_diagnostics(path: PathBuf) {
             params["identifier"] = json!(i);
         }
         let Ok(reply) = client.request_raw("textDocument/diagnostic", params).await else { continue };
-        if doc.version.get() != version {
-            return;
-        }
         if reply.get("kind").and_then(Value::as_str) == Some("unchanged") {
             continue;
         }
-        let items: Vec<lt::Diagnostic> = reply.get("items").and_then(|i| serde_json::from_value(i.clone()).ok()).unwrap_or_default();
+        let mut items: Vec<lt::Diagnostic> = reply.get("items").and_then(|i| serde_json::from_value(i.clone()).ok()).unwrap_or_default();
+        // Typed on meanwhile: the squiggles move with the text instead of
+        // waiting for a pause long enough for a whole round trip (which
+        // made them late); the next pull corrects them.
+        if doc.version.get() != version {
+            let change = anvil_lsp::position::change_event(&asked, &doc.text());
+            for d in &mut items {
+                d.range.start = anvil_lsp::position::shift(d.range.start, &change);
+                d.range.end = anvil_lsp::position::shift(d.range.end, &change);
+            }
+        }
         set_diagnostics(&path, id.as_deref().unwrap_or("pull"), items);
     }
 }
@@ -977,9 +990,28 @@ mod provider {
     use super::*;
     use glib::subclass::prelude::*;
 
+    /// One shown list: its store, every item the server gave for it and
+    /// the proposals made so far (only shown items become objects).
+    pub struct Last {
+        pub store: gio::ListStore,
+        pub items: Vec<lt::CompletionItem>,
+        pub made: RefCell<Vec<Option<Proposal>>>,
+    }
+
+    impl Last {
+        /// The best matches of `order` (at most 400) as proposals.
+        fn proposals(&self, order: &[usize]) -> Vec<Proposal> {
+            let mut made = self.made.borrow_mut();
+            order.iter().take(400).map(|&i| made[i].get_or_insert_with(|| Proposal::new(self.items[i].clone())).clone()).collect()
+        }
+    }
+
     #[derive(Default)]
     pub struct Provider {
         pub doc: RefCell<std::rc::Weak<CodeDoc>>,
+        /// The list shown last: typing (and Backspace) re-ranks its items
+        /// instead of asking the server again.
+        pub last: RefCell<Option<Last>>,
     }
 
     #[glib::object_subclass]
@@ -991,8 +1023,18 @@ mod provider {
 
     impl ObjectImpl for Provider {}
 
-    fn filter_text(i: &lt::CompletionItem) -> String {
-        i.filter_text.clone().unwrap_or_else(|| i.label.clone()).to_lowercase()
+    /// The identifier before the caret, as typed by now.
+    fn word_before_caret(doc: &CodeDoc) -> String {
+        let end = doc.buffer.iter_at_mark(&doc.buffer.get_insert());
+        let mut start = end;
+        while start.backward_char() {
+            let c = start.char();
+            if !(c.is_alphanumeric() || c == '_') {
+                start.forward_char();
+                break;
+            }
+        }
+        doc.buffer.text(&start, &end, false).to_string()
     }
 
     impl CompletionProviderImpl for Provider {
@@ -1004,50 +1046,54 @@ mod provider {
             c == '.'
         }
 
-        fn populate_future(&self, context: &sourceview5::CompletionContext) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gio::ListModel, glib::Error>>>> {
+        fn populate_future(&self, _context: &sourceview5::CompletionContext) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gio::ListModel, glib::Error>>>> {
             let doc = self.doc.borrow().upgrade();
-            let word = context.word().to_lowercase();
+            let provider = self.obj().downgrade();
             Box::pin(async move {
                 let store = gio::ListStore::new::<Proposal>();
                 let (Some(doc), Some(client)) = (doc, crate::ui::window::app().lsp.client()) else { return Ok(store.upcast()) };
-                let version = doc.version.get();
                 let params = position_params(&doc);
                 let v = client.request_raw("textDocument/completion", params).await.unwrap_or(Value::Null);
-                if doc.version.get() != version {
+                // Keys typed while Roslyn answered narrow the list now; an
+                // empty answer for an older version would close the popup.
+                let word = word_before_caret(&doc);
+                // Roslyn's lists run to thousands of items: decoding and
+                // ranking them took 16-25 ms on the main thread.
+                let Ok((items, order)) = gio::spawn_blocking(move || {
+                    let items: Vec<lt::CompletionItem> = match serde_json::from_value::<lt::CompletionResponse>(v) {
+                        Ok(lt::CompletionResponse::Array(a)) => a,
+                        Ok(lt::CompletionResponse::List(l)) => l.items,
+                        Err(_) => Vec::new(),
+                    };
+                    let order = anvil_lsp::completion::rank(&items, &word);
+                    (items, order)
+                })
+                .await
+                else {
                     return Ok(store.upcast());
-                }
-                let items: Vec<lt::CompletionItem> = match serde_json::from_value::<lt::CompletionResponse>(v) {
-                    Ok(lt::CompletionResponse::Array(a)) => a,
-                    Ok(lt::CompletionResponse::List(l)) => l.items,
-                    Err(_) => Vec::new(),
                 };
-                let mut items: Vec<lt::CompletionItem> = items.into_iter().filter(|i| word.is_empty() || filter_text(i).contains(&word)).collect();
-                items.sort_by(|a, b| {
-                    let pa = !filter_text(a).starts_with(&word);
-                    let pb = !filter_text(b).starts_with(&word);
-                    (pa, a.sort_text.clone().unwrap_or_else(|| a.label.clone())).cmp(&(pb, b.sort_text.clone().unwrap_or_else(|| b.label.clone())))
-                });
-                for i in items.into_iter().take(400) {
-                    store.append(&Proposal::new(i));
+                let _s = crate::frame_log::span("completion list");
+                let last = Last { store: store.clone(), made: RefCell::new(vec![None; items.len()]), items };
+                store.splice(0, 0, &last.proposals(&order));
+                if let Some(p) = provider.upgrade() {
+                    *p.imp().last.borrow_mut() = Some(last);
                 }
                 Ok(store.upcast())
             })
         }
 
         fn refilter(&self, context: &sourceview5::CompletionContext, model: &gio::ListModel) {
-            let word = context.word().to_lowercase();
+            let _s = crate::frame_log::span("completion refilter");
+            let word = context.word();
             let Some(store) = model.downcast_ref::<gio::ListStore>() else { return };
-            let mut keep = Vec::new();
-            for i in 0..store.n_items() {
-                if let Some(p) = store.item(i).and_downcast::<Proposal>()
-                    && filter_text(&p.item()).contains(&word)
-                {
-                    keep.push(p);
-                }
-            }
-            store.remove_all();
-            for p in keep {
-                store.append(&p);
+            let last = self.last.borrow();
+            let Some(last) = last.as_ref().filter(|l| &l.store == store) else { return };
+            let next = last.proposals(&anvil_lsp::completion::rank(&last.items, &word));
+            // One splice, and none when nothing changed: the list neither
+            // flickers nor loses its place.
+            let same = next.len() == store.n_items() as usize && next.iter().enumerate().all(|(i, p)| store.item(i as u32).as_ref() == Some(p.upcast_ref::<glib::Object>()));
+            if !same {
+                store.splice(0, store.n_items(), &next);
             }
         }
 
@@ -1242,6 +1288,11 @@ thread_local! {
 }
 
 pub fn completion_visible(_doc: &CodeDoc) -> bool {
+    completion_open()
+}
+
+/// The IntelliSense list is showing (its keys are its own).
+pub fn completion_open() -> bool {
     COMPLETION_OPEN.with(Cell::get)
 }
 
@@ -1445,7 +1496,10 @@ async fn ai_complete(doc: Rc<CodeDoc>, explicit: bool) {
         return;
     };
     // Small context: on a CPU the prompt costs more than the answer.
-    let sigs = crate::ui::chat::project_signatures(800);
+    let sigs = crate::ui::chat::project_signatures(800).await;
+    if doc.change_serial.get() != serial {
+        return;
+    }
     let (prefix, suffix) = anvil_ai::context::fim(&text, cursor, &sigs, 3000);
     let handle = crate::runtime::handle().spawn(async move {
         let models = ollama.models().await?;

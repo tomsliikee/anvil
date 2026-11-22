@@ -186,12 +186,18 @@ pub struct CodeDoc {
     /// Type, method and property spans from the syntax tree, as last
     /// applied, and the character count they were computed for.
     highlights: RefCell<(Vec<highlight::Span>, i32)>,
+    /// The buffer's text, kept in step by its insert and delete signals:
+    /// copying a large buffer out of GTK takes longer than a frame, and
+    /// LSP, completion, highlighting and AI each want the text per pause.
+    mirror: RefCell<String>,
     highlight_timer: RefCell<Option<glib::SourceId>>,
     /// The breakpoint marks drawn last; they move with the text.
     bp_marks: RefCell<Vec<sourceview5::Mark>>,
     /// An expanded snippet's remaining tab stops (start, end) and where
     /// the caret ends; Tab walks them, Enter or Escape leaves.
     pub snippet: RefCell<Option<SnippetFields>>,
+    /// Gliding scroll and Anvil's own caret.
+    pub smooth: Rc<crate::ui::smooth::Smooth>,
 }
 
 const HIGHLIGHT_TAGS: [(&str, highlight::Kind, &str); 3] = [
@@ -225,9 +231,25 @@ impl CodeDoc {
         *self.highlight_timer.borrow_mut() = Some(id);
     }
 
-    fn highlight_now(&self) {
+    /// Parses on a worker thread (a full tree-sitter pass over a large
+    /// file takes longer than a frame) and tags on the main thread, unless
+    /// the text changed meanwhile: the next pass is already scheduled then.
+    fn highlight_now(self: &Rc<Self>) {
         let text = self.text();
-        let new = highlight::spans(&text);
+        let serial = self.change_serial.get();
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Ok(new) = gio::spawn_blocking(move || highlight::spans(&text)).await else { return };
+            if let Some(d) = weak.upgrade()
+                && d.change_serial.get() == serial
+            {
+                d.apply_highlights(new);
+            }
+        });
+    }
+
+    fn apply_highlights(&self, new: Vec<highlight::Span>) {
+        let _s = crate::frame_log::span("name highlight");
         let count = self.buffer.char_count();
         let (old, old_count) = std::mem::take(&mut *self.highlights.borrow_mut());
         let range = if old.is_empty() && old_count == 0 { Some((0, count as usize)) } else { highlight::changed_range(&old, &new, (count - old_count) as isize) };
@@ -245,6 +267,12 @@ impl CodeDoc {
     }
 
     pub fn text(&self) -> String {
+        self.mirror.borrow().clone()
+    }
+
+    /// The text as GTK holds it (for saving: what is written must be the
+    /// buffer itself, not a copy of it).
+    fn buffer_text(&self) -> String {
         let (s, e) = self.buffer.bounds();
         self.buffer.text(&s, &e, true).to_string()
     }
@@ -263,9 +291,7 @@ impl CodeDoc {
 
     /// Byte offset of the caret in [`CodeDoc::text`].
     pub fn cursor_byte(&self) -> usize {
-        let it = self.buffer.iter_at_mark(&self.buffer.get_insert());
-        let start = self.buffer.start_iter();
-        self.buffer.text(&start, &it, true).len()
+        char_to_byte(&self.mirror.borrow(), 0, self.cursor_offset() as usize)
     }
 
     pub fn iter_at_byte(&self, byte: usize) -> gtk::TextIter {
@@ -284,7 +310,12 @@ impl CodeDoc {
     }
 
     pub fn save(&self) -> std::io::Result<()> {
-        let file = TextFile { encoding: self.encoding.get(), eol: self.eol.get(), text: self.text() };
+        let text = self.buffer_text();
+        if *self.mirror.borrow() != text {
+            eprintln!("anvil: the text copy of {} drifted from the buffer; resynced", self.path().display());
+            *self.mirror.borrow_mut() = text.clone();
+        }
+        let file = TextFile { encoding: self.encoding.get(), eol: self.eol.get(), text };
         file.write(&self.path())?;
         self.buffer.set_modified(false);
         Ok(())
@@ -326,7 +357,9 @@ impl CodeDoc {
         it.forward_chars(col.max(0));
         self.buffer.place_cursor(&it);
         let mark = self.buffer.get_insert();
-        self.view.scroll_to_mark(&mark, 0.15, true, 0.0, 0.35);
+        if !self.smooth.scroll_to_iter(&it, 0.35) {
+            self.view.scroll_to_mark(&mark, 0.15, true, 0.0, 0.35);
+        }
         self.view.grab_focus();
     }
 
@@ -991,6 +1024,7 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
     let scroller = gtk::ScrolledWindow::builder().child(&view).vexpand(true).hexpand(true).build();
     let root = gtk::Overlay::new();
     root.set_child(Some(&scroller));
+    let smooth = crate::ui::smooth::Smooth::attach(&view, &scroller, &root);
     let find = crate::ui::find::FindBar::new(&buffer, view.upcast_ref());
     root.add_overlay(&find.widget);
 
@@ -1007,16 +1041,40 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
         diagnostics: RefCell::default(),
         change_serial: Cell::new(0),
         highlights: RefCell::default(),
+        mirror: RefCell::new(String::new()),
         highlight_timer: RefCell::default(),
         bp_marks: RefCell::default(),
         snippet: RefCell::default(),
+        smooth,
     });
+    *doc.mirror.borrow_mut() = doc.buffer_text();
     doc.highlight_now();
 
+    // Before GTK's own handlers (both signals run theirs last), so the
+    // iterators still point into the old text.
+    let weak_m = Rc::downgrade(&doc);
+    buffer.connect_insert_text(move |_, at, text| {
+        if let Some(d) = weak_m.upgrade() {
+            let mut m = d.mirror.borrow_mut();
+            let byte = char_to_byte(&m, 0, at.offset() as usize);
+            m.insert_str(byte, text);
+        }
+    });
+    let weak_m = Rc::downgrade(&doc);
+    buffer.connect_delete_range(move |_, a, b| {
+        if let Some(d) = weak_m.upgrade() {
+            let mut m = d.mirror.borrow_mut();
+            let (lo, hi) = (a.offset().min(b.offset()) as usize, a.offset().max(b.offset()) as usize);
+            let start = char_to_byte(&m, 0, lo);
+            let end = char_to_byte(&m, start, hi - lo);
+            m.replace_range(start..end, "");
+        }
+    });
     // Typing turns a preview tab into a normal one, as in VS.
     let weak = Rc::downgrade(&doc);
     buffer.connect_changed(move |_| {
         let Some(doc) = weak.upgrade() else { return };
+        let _s = crate::frame_log::span("buffer changed");
         doc.version.set(doc.version.get() + 1);
         doc.change_serial.set(doc.change_serial.get() + 1);
         doc.schedule_highlight();
@@ -1096,6 +1154,11 @@ fn new_code_doc(path: &Path) -> std::io::Result<Rc<CodeDoc>> {
     crate::ui::lsp::attach_providers(&doc);
     crate::ui::lsp::attach_context_menu(&doc);
     Ok(doc)
+}
+
+/// The byte `chars` characters after byte `from` of `text` (clamped).
+fn char_to_byte(text: &str, from: usize, chars: usize) -> usize {
+    text[from..].char_indices().nth(chars).map_or(text.len(), |(i, _)| from + i)
 }
 
 fn create_tags(buffer: &sourceview5::Buffer) {

@@ -26,21 +26,26 @@ pub struct Chat {
     state: gtk::Label,
 }
 
-/// Signatures of the solution's types for the model's context.
-pub fn project_signatures(max_chars: usize) -> String {
+/// Signatures of the solution's types for the model's context. The open
+/// files' texts are taken here; reading and parsing the rest of the
+/// solution runs on a worker thread, not in the frame.
+pub async fn project_signatures(max_chars: usize) -> String {
     let app = crate::ui::window::app();
     let Some(sol) = app.solution.borrow().clone() else { return String::new() };
-    let files: Vec<anvil_core::csharp::FileStructure> = sol
-        .projects
-        .iter()
-        .flat_map(|p| p.source_files())
-        .map(|f| {
-            let t = app.tabs.code_doc(&f).map(|d| d.text()).or_else(|| anvil_core::text::TextFile::read(&f).ok().map(|x| x.text)).unwrap_or_default();
-            anvil_core::csharp::parse(&t)
-        })
-        .collect();
-    let refs: Vec<&anvil_core::csharp::FileStructure> = files.iter().collect();
-    anvil_ai::context::signatures(&refs, max_chars)
+    let sources: Vec<(PathBuf, Option<String>)> = sol.projects.iter().flat_map(|p| p.source_files()).map(|f| (f.clone(), app.tabs.code_doc(&f).map(|d| d.text()))).collect();
+    gtk::gio::spawn_blocking(move || {
+        let files: Vec<anvil_core::csharp::FileStructure> = sources
+            .into_iter()
+            .map(|(f, text)| {
+                let t = text.or_else(|| anvil_core::text::TextFile::read(&f).ok().map(|x| x.text)).unwrap_or_default();
+                anvil_core::csharp::parse(&t)
+            })
+            .collect();
+        let refs: Vec<&anvil_core::csharp::FileStructure> = files.iter().collect();
+        anvil_ai::context::signatures(&refs, max_chars)
+    })
+    .await
+    .unwrap_or_default()
 }
 
 impl Chat {
@@ -161,14 +166,16 @@ impl Chat {
         let selection = doc.as_ref().map(|d| d.selection_text()).filter(|s| !s.is_empty());
         let error = if self.attach_error.is_active() { app.errors_selected_text() } else { None };
         let content = anvil_ai::context::chat_message(&question, file.as_ref().map(|(p, t)| (p.as_str(), t.as_str())), selection.as_deref(), error.as_deref());
-        let mut msgs = vec![ChatMessage::new("system", format!("{}\n\nProject types:\n{}", anvil_ai::context::SYSTEM_PROMPT, project_signatures(3000)))];
-        msgs.extend(self.history.borrow().iter().cloned());
-        msgs.push(ChatMessage::new("user", content));
+        let earlier: Vec<ChatMessage> = self.history.borrow().clone();
+        let signatures = project_signatures(3000);
         self.history.borrow_mut().push(ChatMessage::new("user", question));
         let model = self.model.selected_item().and_downcast::<gtk::StringObject>().map(|s| s.string().to_string()).unwrap_or_default();
         let url = app.settings.string("ollama-url").to_string();
         let answer = self.bubble("…", false);
         glib::spawn_future_local(async move {
+            let mut msgs = vec![ChatMessage::new("system", format!("{}\n\nProject types:\n{}", anvil_ai::context::SYSTEM_PROMPT, signatures.await))];
+            msgs.extend(earlier);
+            msgs.push(ChatMessage::new("user", content));
             let Some(o) = Ollama::new(&url) else { return };
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
             let handle = crate::runtime::handle().spawn(async move { o.chat(&model, &msgs, tx).await });

@@ -28,12 +28,15 @@ pub fn build() -> adw::Application {
         }
         let win = ui::window::build(app);
         win.window.present();
+        crate::frame_log::watch_window(&win.window);
         if let Some(dir) = shots::requested() {
             shots::run(dir);
         } else if let Ok(path) = std::env::var("ANVIL_OPEN") {
             ui::window::open_path(std::path::Path::new(&path));
         }
     });
+
+    app.connect_shutdown(|_| crate::frame_log::report());
 
     app.connect_open(|app, files, _| {
         app.activate();

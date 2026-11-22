@@ -23,6 +23,7 @@ pub fn requested() -> Option<PathBuf> {
 
 /// Saves what `widget` (a window or a dialog's toplevel) shows now.
 fn save(widget: &gtk::Widget, dir: &Path, name: &str) {
+    let _s = crate::frame_log::span("screenshot");
     let (w, h) = (widget.width() as f32, widget.height() as f32);
     let paintable = gtk::WidgetPaintable::new(Some(widget));
     let snapshot = gtk::Snapshot::new();
@@ -82,6 +83,15 @@ pub fn run(dir: PathBuf) {
         && let Ok(open) = std::env::var("ANVIL_OPEN")
     {
         steps.extend(ui_steps(PathBuf::from(open)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
+    // ANVIL_SHOTS=typing: types into ANVIL_TYPE_FILE (a large file of the
+    // solution, at its `// TYPE HERE` line) for the frame log.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("typing")
+        && let (Ok(open), Ok(file)) = (std::env::var("ANVIL_OPEN"), std::env::var("ANVIL_TYPE_FILE"))
+    {
+        steps.extend(typing_steps(PathBuf::from(open), PathBuf::from(file)));
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
@@ -381,6 +391,109 @@ fn ui_steps(sol: PathBuf) -> Vec<Step> {
         act(close_dialogs),
     ]);
     steps
+}
+
+/// Waits for Roslyn, then types C# at about 14 keys a second, with a
+/// pause after each line (where highlighting, diagnostics and the
+/// designer catch up), and scrolls; `ANVIL_TYPE_DIAGRAM` opens a class
+/// diagram beside it. The frame log's summary covers the typing only.
+fn typing_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
+    let diagram = std::env::var("ANVIL_TYPE_DIAGRAM").ok().map(PathBuf::from);
+    let lines: usize = std::env::var("ANVIL_TYPE_LINES").ok().and_then(|v| v.parse().ok()).unwrap_or(12);
+    let ready = || crate::ui::window::app().lsp.client().is_some();
+    let mut steps = vec![act(move || window::open_path(&sol)), Step::Wait(1500)];
+    if let Some(d) = diagram {
+        steps.push(act(move || {
+            crate::ui::window::app().tabs.open(&d, false);
+        }));
+        steps.push(Step::Wait(800));
+    }
+    steps.extend([
+        act(move || {
+            let app = crate::ui::window::app();
+            app.tabs.open(&file, false);
+            if let Some(d) = app.tabs.current_code()
+                && let Some(i) = d.text().find("// TYPE HERE")
+            {
+                d.goto_line_col(d.iter_at_byte(i).line() + 1, 0);
+            }
+        }),
+        until(ready, 120_000),
+        // Roslyn loads the projects after it is ready.
+        Step::Wait(25_000),
+        act(close_dialogs),
+        act(move || {
+            // Again, now that the view has its size: the caret's line on
+            // screen, so typing paints what it changes.
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                let line = d.buffer.iter_at_mark(&d.buffer.get_insert()).line();
+                d.goto_line_col(line, 0);
+            }
+        }),
+        Step::Wait(1000),
+        Step::Shot("typing-before"),
+        act(move || {
+            crate::frame_log::reset();
+            type_script(SCRIPT.repeat(lines.div_ceil(3)).chars().collect(), 0);
+        }),
+        until(|| TYPING_DONE.with(std::cell::Cell::get), 600_000),
+        Step::Shot("typing-after"),
+        // The typing summary, then one for four seconds at rest (the caret
+        // blinks); the summary at exit covers the glide.
+        act(|| {
+            crate::frame_log::report();
+            crate::frame_log::reset();
+            // The editor's text copy must still equal the buffer.
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                let (s, e) = d.buffer.bounds();
+                let same = d.text() == d.buffer.text(&s, &e, true);
+                eprintln!("anvil: text copy after typing: {}", if same { "equal" } else { "DIFFERS" });
+            }
+        }),
+        Step::Wait(4000),
+        act(|| {
+            crate::frame_log::report();
+            crate::frame_log::reset();
+        }),
+        // A jump far down: the glide in flight, then where it lands.
+        act(|| {
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                d.goto_line_col(4000, 8);
+            }
+        }),
+        Step::Wait(60),
+        Step::Shot("typing-glide"),
+        Step::Wait(500),
+        Step::Shot("typing-landed"),
+        Step::Wait(2000),
+        act(|| {
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                d.buffer.set_modified(false);
+            }
+        }),
+    ]);
+    steps
+}
+
+const SCRIPT: &str = "            var list = new System.Collections.Generic.List<int>();\n            list.Add(list.Count + 42);\n            Console.WriteLine(list.Count);\n";
+
+thread_local! {
+    static TYPING_DONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// One key per call, as the text view's own `insert-at-cursor` (the path
+/// typed text takes), 70 ms apart and 700 ms after a line.
+fn type_script(chars: Vec<char>, i: usize) {
+    let Some(&c) = chars.get(i) else {
+        TYPING_DONE.with(|d| d.set(true));
+        return;
+    };
+    if let Some(d) = crate::ui::window::app().tabs.current_code() {
+        crate::frame_log::keystroke();
+        d.view.emit_insert_at_cursor(&c.to_string());
+    }
+    let delay = if c == '\n' { 700 } else { 70 };
+    glib::timeout_add_local_once(Duration::from_millis(delay), move || type_script(chars, i + 1));
 }
 
 /// Breakpoint with hit count 3 in the loop, F5, Locals, a step (changed

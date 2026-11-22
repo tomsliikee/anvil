@@ -18,6 +18,7 @@ pub mod nuget;
 pub mod output;
 pub mod properties;
 pub mod settings;
+pub mod smooth;
 pub mod start;
 pub mod status;
 pub mod terminal;
