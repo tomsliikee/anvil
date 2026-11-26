@@ -625,7 +625,11 @@ pub fn apply_workspace_edit(edit: &lt::WorkspaceEdit) -> bool {
                     }
                 }
                 lt::DocumentChangeOperation::Op(lt::ResourceOp::Create(c)) => {
-                    if let Some(p) = roslyn::path_from_uri(c.uri.as_str()) {
+                    // An existing file (an `.editorconfig` a severity fix
+                    // writes to) is kept unless the server asks to overwrite.
+                    if let Some(p) = roslyn::path_from_uri(c.uri.as_str())
+                        && (!p.exists() || c.options.as_ref().and_then(|o| o.overwrite) == Some(true))
+                    {
                         ok &= anvil_core::text::TextFile::vs_new("").write(&p).is_ok();
                     }
                 }
@@ -656,6 +660,38 @@ fn position_params(doc: &CodeDoc) -> Value {
     let text = doc.text();
     let pos = to_position(&text, doc.cursor_byte());
     json!({"textDocument": {"uri": uri_string(&doc.path())}, "position": pos})
+}
+
+/// Characters after which Roslyn is asked without a typed word: member
+/// access, `new `/`return `/`is ` style keywords (Roslyn answers nothing
+/// where a space is no trigger), generic arguments.
+const TRIGGERS: [char; 2] = ['.', '<'];
+
+/// Keywords after which a space asks for types (VS lists them there).
+const TYPE_KEYWORDS: [&str; 3] = ["new", "is", "as"];
+
+/// The identifier that ends at `at` (a trailing space skipped).
+fn word_ending_at(text: &str, at: usize) -> &str {
+    let head = text.get(..at).unwrap_or("").trim_end_matches(' ');
+    let start = head.rfind(|c: char| !(c.is_alphanumeric() || c == '_')).map_or(0, |i| i + head[i..].chars().next().map_or(1, char::len_utf8));
+    &head[start..]
+}
+
+/// `textDocument/completion` parameters: invoked while typing a word, a
+/// trigger character right after one of `TRIGGERS`, or (`kind` 3) asked
+/// again because the list the server gave was incomplete.
+fn completion_params(doc: &CodeDoc, kind: u8) -> Value {
+    let text = doc.text();
+    let at = doc.cursor_byte();
+    let mut p = position_params(doc);
+    let last = text.get(..at).and_then(|t| t.chars().last());
+    // Roslyn answers `null` to a space sent as a trigger character; after
+    // a type keyword the list is simply asked for.
+    p["context"] = match last {
+        Some(c) if kind == 1 && TRIGGERS.contains(&c) => json!({"triggerKind": 2, "triggerCharacter": c.to_string()}),
+        _ => json!({"triggerKind": kind}),
+    };
+    p
 }
 
 fn need_server() -> Option<(Client, Rc<CodeDoc>)> {
@@ -805,6 +841,30 @@ pub fn document_outline() {
 
 // ---- Completion ------------------------------------------------------------
 
+/// The completion popup's width. GtkSourceView's own stylesheet asks for
+/// 150 px, but it takes the width at the moment it is shown, when the rows
+/// (made on the next frame) do not exist yet: GTK then logs
+/// `gdk_popup_present: assertion 'width > 0' failed` and the list never
+/// appears. A width request makes the first measure right.
+const LIST_WIDTH: i32 = 340;
+
+/// Sizes the view's completion list and follows its map state (the
+/// completion's own `show`/`hide` are actions, not notifications). Cheap
+/// and idempotent; the list exists from the first completion on.
+fn prepare_list(view: &impl IsA<gtk::Widget>) {
+    let mut child = view.first_child();
+    while let Some(w) = child {
+        if w.type_().name() == "GtkSourceCompletionList" && w.width_request() != LIST_WIDTH {
+            w.set_width_request(LIST_WIDTH);
+            COMPLETION_OPEN.with(|c| c.set(w.is_mapped()));
+            w.connect_map(|_| COMPLETION_OPEN.with(|c| c.set(true)));
+            w.connect_unmap(|_| COMPLETION_OPEN.with(|c| c.set(false)));
+        }
+        child = w.next_sibling();
+    }
+}
+
+
 mod proposal {
     use super::*;
     use glib::subclass::prelude::*;
@@ -853,6 +913,10 @@ mod provider {
         pub store: gio::ListStore,
         pub items: Vec<lt::CompletionItem>,
         pub made: RefCell<Vec<Option<Proposal>>>,
+        /// The server cut the list: more words need a new request.
+        pub incomplete: bool,
+        /// Letters of the word the request was made for.
+        pub word_len: usize,
     }
 
     impl Last {
@@ -869,6 +933,8 @@ mod provider {
         /// The list shown last: typing (and Backspace) re-ranks its items
         /// instead of asking the server again.
         pub last: RefCell<Option<Last>>,
+        /// A request for an incomplete list is under way.
+        pub refetching: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -894,13 +960,71 @@ mod provider {
         doc.buffer.text(&start, &end, false).to_string()
     }
 
+    /// Decodes and ranks an answer off the main thread (Roslyn's lists run
+    /// to thousands of items: 16-25 ms there).
+    async fn decode(v: Value, word: String) -> Result<(Vec<lt::CompletionItem>, Vec<usize>, bool), Box<dyn std::any::Any + Send>> {
+        gio::spawn_blocking(move || {
+            let (items, incomplete) = match serde_json::from_value::<lt::CompletionResponse>(v) {
+                Ok(lt::CompletionResponse::Array(a)) => (a, false),
+                Ok(lt::CompletionResponse::List(l)) => (l.items, l.is_incomplete),
+                Err(_) => (Vec::new(), false),
+            };
+            let order = anvil_lsp::completion::rank(&items, &word);
+            (items, order, incomplete)
+        })
+        .await
+    }
+
+    /// The list was cut by the server and the word has grown: ask again for
+    /// the longer word, then re-rank in place (the popup keeps its place).
+    /// Typing on meanwhile makes it go once more.
+    async fn refetch(provider: glib::WeakRef<super::CompletionProvider>, store: gio::ListStore, mut kind: u8) {
+        loop {
+            let Some(p) = provider.upgrade() else { return };
+            let Some(doc) = p.imp().doc.borrow().upgrade() else { break };
+            let Some(client) = crate::ui::window::app().lsp.client() else { break };
+            let v = client.request_raw("textDocument/completion", completion_params(&doc, kind)).await.unwrap_or(Value::Null);
+            let word = word_before_caret(&doc);
+            let word_len = word.chars().count();
+            let Ok((items, order, incomplete)) = decode(v, word).await else { break };
+            let Some(p) = provider.upgrade() else { return };
+            if p.imp().last.borrow().as_ref().is_none_or(|l| l.store != store) {
+                break;
+            }
+            let last = Last { store: store.clone(), made: RefCell::new(vec![None; items.len()]), items, incomplete, word_len };
+            // An empty answer must not close the popup under the typist.
+            if !order.is_empty() {
+                store.splice(0, store.n_items(), &last.proposals(&order));
+            }
+            *p.imp().last.borrow_mut() = Some(last);
+            kind = if incomplete { 3 } else { 1 };
+            let again = word_before_caret(&doc).chars().count() > word_len && (incomplete || order.is_empty());
+            if !again {
+                break;
+            }
+        }
+        if let Some(p) = provider.upgrade() {
+            p.imp().refetching.set(false);
+        }
+    }
+
     impl CompletionProviderImpl for Provider {
         fn title(&self) -> Option<glib::GString> {
             Some("C#".into())
         }
 
-        fn is_trigger(&self, _iter: &gtk::TextIter, c: char) -> bool {
-            c == '.'
+        fn is_trigger(&self, iter: &gtk::TextIter, c: char) -> bool {
+            if TRIGGERS.contains(&c) {
+                return true;
+            }
+            if c != ' ' {
+                return false;
+            }
+            // A space after `new`, `is`, `as`: look at the line up to it.
+            let mut start = *iter;
+            start.set_line_offset(0);
+            let line = start.text(iter).to_string();
+            TYPE_KEYWORDS.contains(&word_ending_at(&line, line.len()))
         }
 
         fn populate_future(&self, _context: &sourceview5::CompletionContext) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gio::ListModel, glib::Error>>>> {
@@ -909,28 +1033,22 @@ mod provider {
             Box::pin(async move {
                 let store = gio::ListStore::new::<Proposal>();
                 let (Some(doc), Some(client)) = (doc, crate::ui::window::app().lsp.client()) else { return Ok(store.upcast()) };
-                let params = position_params(&doc);
+                let params = completion_params(&doc, 1);
                 let v = client.request_raw("textDocument/completion", params).await.unwrap_or(Value::Null);
                 // Keys typed while Roslyn answered narrow the list now; an
                 // empty answer for an older version would close the popup.
                 let word = word_before_caret(&doc);
                 // Roslyn's lists run to thousands of items: decoding and
                 // ranking them took 16-25 ms on the main thread.
-                let Ok((items, order)) = gio::spawn_blocking(move || {
-                    let items: Vec<lt::CompletionItem> = match serde_json::from_value::<lt::CompletionResponse>(v) {
-                        Ok(lt::CompletionResponse::Array(a)) => a,
-                        Ok(lt::CompletionResponse::List(l)) => l.items,
-                        Err(_) => Vec::new(),
-                    };
-                    let order = anvil_lsp::completion::rank(&items, &word);
-                    (items, order)
-                })
-                .await
-                else {
+                let word_len = word.chars().count();
+                let Ok((items, order, incomplete)) = decode(v, word).await else {
                     return Ok(store.upcast());
                 };
                 let _s = crate::frame_log::span("completion list");
-                let last = Last { store: store.clone(), made: RefCell::new(vec![None; items.len()]), items };
+                prepare_list(&doc.view);
+                let view = doc.view.clone();
+                glib::idle_add_local_once(move || prepare_list(&view));
+                let last = Last { store: store.clone(), made: RefCell::new(vec![None; items.len()]), items, incomplete, word_len };
                 store.splice(0, 0, &last.proposals(&order));
                 if let Some(p) = provider.upgrade() {
                     *p.imp().last.borrow_mut() = Some(last);
@@ -946,6 +1064,13 @@ mod provider {
             let last = self.last.borrow();
             let Some(last) = last.as_ref().filter(|l| &l.store == store) else { return };
             let next = last.proposals(&anvil_lsp::completion::rank(&last.items, &word));
+            // A list the server cut, or an empty one (a trigger character such
+            // as the space after `=` opened this context, the word came
+            // later), is asked for again as the word grows.
+            let grown = word.chars().count() > last.word_len;
+            if grown && (last.incomplete || last.items.is_empty()) && !self.refetching.replace(true) {
+                glib::spawn_future_local(refetch(self.obj().downgrade(), store.clone(), if last.incomplete { 3 } else { 1 }));
+            }
             // One splice, and none when nothing changed: the list neither
             // flickers nor loses its place.
             let same = next.len() == store.n_items() as usize && next.iter().enumerate().all(|(i, p)| store.item(i as u32).as_ref() == Some(p.upcast_ref::<glib::Object>()));
@@ -1159,8 +1284,8 @@ pub fn attach_providers(doc: &Rc<CodeDoc>) {
     *provider.imp().doc.borrow_mut() = Rc::downgrade(doc);
     completion.add_provider(&provider);
     completion.set_select_on_show(true);
-    completion.connect_show(|_| COMPLETION_OPEN.with(|c| c.set(true)));
-    completion.connect_hide(|_| COMPLETION_OPEN.with(|c| c.set(false)));
+    completion.set_page_size(9);
+    prepare_list(&doc.view);
     let hover = doc.view.hover();
     let hp: HoverProvider = glib::Object::new();
     *hp.imp().doc.borrow_mut() = Rc::downgrade(doc);
@@ -1419,5 +1544,27 @@ mod tests {
         assert_eq!(strip_snippet("Console.WriteLine($0);", true), ("Console.WriteLine();".to_owned(), Some(18)));
         assert_eq!(strip_snippet("for (${1:i})", true), ("for (i)".to_owned(), Some(5)));
         assert_eq!(strip_snippet("plain$0", false), ("plain$0".to_owned(), None));
+    }
+}
+
+#[cfg(test)]
+mod completion_tests {
+    use super::*;
+
+    #[test]
+    fn finds_the_word_before_a_space_or_the_caret() {
+        assert_eq!(word_ending_at("var o = new ", 12), "new");
+        assert_eq!(word_ending_at("var o = new", 11), "new");
+        assert_eq!(word_ending_at("if (x is ", 9), "is");
+        assert_eq!(word_ending_at("x = ", 4), "");
+        assert_eq!(word_ending_at("renew ", 6), "renew");
+        assert_eq!(word_ending_at("", 0), "");
+    }
+
+    #[test]
+    fn type_keywords_are_whole_words() {
+        assert!(TYPE_KEYWORDS.contains(&word_ending_at("    new ", 8)));
+        assert!(!TYPE_KEYWORDS.contains(&word_ending_at("    renew ", 10)));
+        assert!(!TYPE_KEYWORDS.contains(&word_ending_at("    x = ", 8)));
     }
 }

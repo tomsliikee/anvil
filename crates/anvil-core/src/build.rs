@@ -37,9 +37,34 @@ pub fn dotnet_args(verb: Verb, target: &Path, restore: bool) -> Vec<String> {
 
 /// A build that failed only because `--no-restore` met missing or stale
 /// assets (NETSDK1004 "assets file not found", NETSDK1005/1047 "no target
-/// for", NU1105 a project that cannot be read): run it again with restore.
+/// for", NETSDK1064 "package not found" (assets written on another
+/// machine), NU1105 a project that cannot be read): run it again with
+/// restore.
 pub fn needs_restore_retry(log: &str) -> bool {
-    ["NETSDK1004", "NETSDK1005", "NETSDK1047", "NU1105"].iter().any(|c| log.contains(c))
+    ["NETSDK1004", "NETSDK1005", "NETSDK1047", "NETSDK1064", "NU1105"].iter().any(|c| log.contains(c))
+}
+
+/// The project an assets file was restored for (`restore.projectPath`),
+/// read without parsing the whole file (it runs to megabytes).
+fn assets_project_path(assets: &str) -> Option<String> {
+    let restore = assets.find("\"restore\": {")?;
+    let key = "\"projectPath\": ";
+    let start = restore + assets[restore..].find(key)? + key.len();
+    let rest = &assets[start..];
+    let mut end = None;
+    let mut escaped = false;
+    for (i, c) in rest.char_indices().skip(1) {
+        match c {
+            _ if escaped => escaped = false,
+            '\\' => escaped = true,
+            '"' => {
+                end = Some(i);
+                break;
+            }
+            _ => {}
+        }
+    }
+    serde_json::from_str(&rest[..=end?]).ok()
 }
 
 /// `start` and every project it references, directly or not; a project
@@ -92,11 +117,19 @@ fn mtime(p: &Path) -> Option<SystemTime> {
 /// restore ran but found nothing to do, NuGet leaves the assets file alone
 /// and only touches `obj/project.nuget.cache`, so the newer of the two
 /// counts. A project that moves its `obj` folder elsewhere is never
-/// current, which only costs the restore it had before.
+/// current, which only costs the restore it had before. Neither is an
+/// assets file restored for another path: an `obj` folder copied from
+/// Windows (or checked in) names `C:\…` package folders and fails with
+/// NETSDK1064 under `--no-restore`.
 pub fn assets_current(project: &Path) -> bool {
     let Some(dir) = project.parent() else { return false };
     let obj = dir.join("obj");
     let Some(assets) = mtime(&obj.join("project.assets.json")) else { return false };
+    let restored_for = std::fs::read_to_string(obj.join("project.assets.json")).ok().and_then(|t| assets_project_path(&t));
+    let same = |p: &str| Path::new(p) == project || std::fs::canonicalize(p).ok().zip(std::fs::canonicalize(project).ok()).is_some_and(|(a, b)| a == b);
+    if !restored_for.as_deref().is_some_and(same) {
+        return false;
+    }
     let restored = mtime(&obj.join("project.nuget.cache")).map_or(assets, |c| c.max(assets));
     let Some(proj) = mtime(project) else { return false };
     if proj > restored {
@@ -125,6 +158,95 @@ pub fn mark_restored(projects: &[PathBuf]) {
         if let Some(f) = cache.filter(|c| c.is_file()).and_then(|c| std::fs::File::options().write(true).open(c).ok()) {
             let _ = f.set_modified(now);
         }
+    }
+}
+
+/// What the last builds reported, kept in `.vs/anvil/build.json`.
+///
+/// An incremental build whose inputs did not change skips the compiler,
+/// and with it every analyzer: the second Build in a row reports no
+/// StyleCop warning at all, although none was fixed. A project whose
+/// output file still has the time stamp it had after the build that
+/// reported its diagnostics was not compiled again, so those diagnostics
+/// still hold and are shown again.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BuildMemory {
+    /// Per project name (`App`): its output file and that file's time
+    /// stamp (nanoseconds since the epoch) after the build.
+    pub outputs: std::collections::BTreeMap<String, (PathBuf, u128)>,
+    /// Per project name: what its last compile reported.
+    pub diagnostics: std::collections::BTreeMap<String, Vec<crate::diagnostics::Diagnostic>>,
+}
+
+fn stamp(p: &Path) -> Option<u128> {
+    mtime(p)?.duration_since(SystemTime::UNIX_EPOCH).ok().map(|d| d.as_nanos())
+}
+
+/// The project a diagnostic belongs to, by name (`[/w/App/App.csproj]`
+/// or a multi-targeting `[…/App.csproj::TargetFramework=net8.0]`).
+pub fn project_name(d: &crate::diagnostics::Diagnostic) -> Option<String> {
+    let p = d.project.as_deref()?;
+    let p = p.split_once("::").map_or(p, |(a, _)| a);
+    Some(crate::slnx::stem(p)).filter(|s| !s.is_empty())
+}
+
+impl BuildMemory {
+    fn path(solution_dir: &Path) -> PathBuf {
+        crate::session::dir(solution_dir).join("build.json")
+    }
+
+    pub fn load(solution_dir: &Path) -> BuildMemory {
+        std::fs::read_to_string(Self::path(solution_dir)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+    }
+
+    pub fn save(&self, solution_dir: &Path) -> std::io::Result<()> {
+        let p = Self::path(solution_dir);
+        std::fs::create_dir_all(p.parent().expect("has a parent"))?;
+        crate::text::write_atomic(&p, serde_json::to_string(self).expect("serialises").as_bytes())
+    }
+
+    /// After a build: `fresh` is what it reported, `finished` each project
+    /// it finished with its output file. Returns the diagnostics to show:
+    /// `fresh`, plus the remembered ones of every finished project whose
+    /// output was not written again. The memory then holds this build.
+    pub fn merge(&mut self, fresh: &[crate::diagnostics::Diagnostic], finished: &[(String, PathBuf)]) -> Vec<crate::diagnostics::Diagnostic> {
+        let mut out = fresh.to_vec();
+        let mut by_project: std::collections::BTreeMap<String, Vec<crate::diagnostics::Diagnostic>> = Default::default();
+        for d in fresh {
+            if let Some(n) = project_name(d) {
+                by_project.entry(n).or_default().push(d.clone());
+            }
+        }
+        for (name, output) in finished {
+            let now = stamp(output);
+            let unchanged = now.is_some() && self.outputs.get(name).is_some_and(|(p, s)| p == output && Some(*s) == now);
+            if unchanged
+                && !by_project.contains_key(name)
+                && let Some(old) = self.diagnostics.get(name)
+            {
+                out.extend(old.iter().filter(|d| !fresh.contains(d)).cloned());
+                by_project.insert(name.clone(), old.clone());
+            }
+            match now {
+                Some(s) => {
+                    self.outputs.insert(name.clone(), (output.clone(), s));
+                }
+                None => {
+                    self.outputs.remove(name);
+                }
+            }
+            self.diagnostics.remove(name);
+        }
+        // Projects that failed (no output line) keep only what they reported now.
+        for (name, list) in by_project {
+            self.diagnostics.insert(name, list);
+        }
+        out
+    }
+
+    /// After Clean: nothing is remembered.
+    pub fn clear(&mut self) {
+        *self = BuildMemory::default();
     }
 }
 
@@ -194,6 +316,62 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
+    /// The part of `project.assets.json` that names the project, as NuGet
+    /// writes it (`path` already JSON-escaped).
+    fn assets_for(path: &str) -> String {
+        format!("{{\n  \"version\": 3,\n  \"project\": {{\n    \"version\": \"1.0.0\",\n    \"restore\": {{\n      \"projectUniqueName\": \"{path}\",\n      \"projectName\": \"App\",\n      \"projectPath\": \"{path}\",\n      \"packagesPath\": \"/x\"\n    }}\n  }}\n}}")
+    }
+
+    fn warn(project: &str, code: &str) -> crate::diagnostics::Diagnostic {
+        crate::diagnostics::Diagnostic { file: format!("/w/{project}/Program.cs"), line: 1, col: 1, severity: crate::diagnostics::Severity::Warning, code: code.into(), message: "m".into(), project: Some(format!("/w/{project}/{project}.csproj")) }
+    }
+
+    #[test]
+    fn an_up_to_date_project_keeps_its_analyzer_warnings() {
+        let d = temp("memory");
+        let (app, lib) = (d.join("App.dll"), d.join("Lib.dll"));
+        std::fs::write(&app, "1").unwrap();
+        std::fs::write(&lib, "1").unwrap();
+        let finished = vec![("App".to_owned(), app.clone()), ("Lib".to_owned(), lib.clone())];
+        let mut m = BuildMemory::default();
+        let first = vec![warn("App", "SA1633"), warn("Lib", "SA1400")];
+        assert_eq!(m.merge(&first, &finished), first);
+        // Second build, nothing compiled: MSBuild reports nothing.
+        assert_eq!(m.merge(&[], &finished), first);
+        // Lib compiled again with its warning fixed; App still up to date.
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(&lib, "2").unwrap();
+        assert_eq!(m.merge(&[], &finished), vec![warn("App", "SA1633")]);
+        // Kept across sessions.
+        m.save(&d).unwrap();
+        let mut again = BuildMemory::load(&d);
+        assert_eq!(again, m);
+        assert_eq!(again.merge(&[], &finished), vec![warn("App", "SA1633")]);
+        // App fails now: no output line, only its fresh errors count.
+        let err = crate::diagnostics::Diagnostic { severity: crate::diagnostics::Severity::Error, code: "CS1002".into(), ..warn("App", "") };
+        assert_eq!(again.merge(std::slice::from_ref(&err), &finished[1..]), vec![err.clone()]);
+        assert_eq!(again.diagnostics.get("App"), Some(&vec![err]));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn project_names_from_diagnostics() {
+        let mut d = warn("App", "SA1633");
+        assert_eq!(project_name(&d).as_deref(), Some("App"));
+        d.project = Some("/w/My Lib/My Lib.csproj::TargetFramework=net8.0".into());
+        assert_eq!(project_name(&d).as_deref(), Some("My Lib"));
+        d.project = None;
+        assert_eq!(project_name(&d), None);
+    }
+
+    #[test]
+    fn reads_the_restored_project_path() {
+        assert_eq!(assets_project_path(&assets_for("/home/t/\\u00dcbung 1/App.csproj")).as_deref(), Some("/home/t/Übung 1/App.csproj"));
+        assert_eq!(assets_project_path(&assets_for("C:\\\\Users\\\\s\\\\App.csproj")).as_deref(), Some("C:\\Users\\s\\App.csproj"));
+        assert_eq!(assets_project_path("{}"), None);
+        assert!(needs_restore_retry("error NETSDK1064: Package StyleCop.Analyzers, version 1.1.118 was not found."));
+    }
+
     #[test]
     fn assets_current_by_mtime() {
         let d = temp("assets");
@@ -202,7 +380,9 @@ mod tests {
         assert!(!assets_current(&p), "never restored");
         std::fs::create_dir_all(d.join("obj")).unwrap();
         std::thread::sleep(Duration::from_millis(20));
-        std::fs::write(d.join("obj/project.assets.json"), "{}").unwrap();
+        std::fs::write(d.join("obj/project.assets.json"), assets_for("C:\\\\Users\\\\s\\\\App\\\\App.csproj")).unwrap();
+        assert!(!assets_current(&p), "restored on Windows: its package folders are not here");
+        std::fs::write(d.join("obj/project.assets.json"), assets_for(&p.to_string_lossy())).unwrap();
         assert!(assets_current(&p));
         std::thread::sleep(Duration::from_millis(20));
         std::fs::write(d.join("Directory.Packages.props"), "<Project/>").unwrap();

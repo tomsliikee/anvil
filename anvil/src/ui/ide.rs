@@ -398,34 +398,88 @@ pub fn lightbulb_clicked(doc: &CodeDoc, line: i32) -> bool {
 /// A code action as offered, and once resolved.
 struct Action {
     title: String,
-    raw: Value,
+    offered: anvil_lsp::code_actions::Offered,
     resolved: Option<Value>,
 }
 
-/// Roslyn groups some fixes ("Suppress or configure issues") as one
-/// action with nested ones; each nested action is offered by itself.
+/// Roslyn's list with nested actions ("Suppress or configure issues") and
+/// each Fix All scope offered as an entry of its own.
 fn flatten_actions(list: Vec<Value>) -> Vec<Action> {
-    let mut out = Vec::new();
-    for a in list {
-        let title = a.get("title").and_then(Value::as_str).unwrap_or("?").to_owned();
-        match a.pointer("/data/NestedCodeActions").and_then(Value::as_array).filter(|n| !n.is_empty()) {
-            Some(nested) => {
-                for n in nested {
-                    let t = n.get("title").and_then(Value::as_str).unwrap_or("?");
-                    out.push(Action { title: format!("{title} › {t}"), raw: n.clone(), resolved: None });
-                }
+    anvil_lsp::code_actions::flatten(&list)
+        .into_iter()
+        .map(|o| {
+            let mut title = o.path.join(" › ");
+            if let Some(scope) = &o.scope {
+                let scope = match scope.as_str() {
+                    "Document" => tr("in Document"),
+                    "Project" => tr("in Project"),
+                    "Solution" => tr("in Solution"),
+                    "ContainingType" => tr("in Containing Type"),
+                    "ContainingMember" => tr("in Containing Member"),
+                    other => other.to_owned(),
+                };
+                title = format!("{title} › {scope}");
             }
-            None => out.push(Action { title, raw: a, resolved: None }),
-        }
-    }
-    out
+            Action { title, offered: o, resolved: None }
+        })
+        .collect()
 }
 
-async fn resolve(client: &Client, a: &Value) -> Value {
-    if a.get("edit").is_some() || a.get("data").is_none() {
-        return a.clone();
+async fn resolve(client: &Client, o: &anvil_lsp::code_actions::Offered) -> Value {
+    match anvil_lsp::code_actions::resolve_request(o) {
+        Some((method, params)) => ask(client, method, params, QUICK).await.unwrap_or_else(|e| {
+            report(&e);
+            o.raw.clone()
+        }),
+        None => o.raw.clone(),
     }
-    ask(client, "codeAction/resolve", a.clone(), QUICK).await.unwrap_or_else(|_| a.clone())
+}
+
+/// The file-header rules StyleCop's own "Add StyleCop settings file" fix
+/// is offered for (`SettingsFileCodeFixProvider` in 1.1.118).
+const SETTINGS_FIX_RULES: [&str; 8] = ["SA1633", "SA1634", "SA1635", "SA1636", "SA1637", "SA1638", "SA1640", "SA1641"];
+
+/// Marks the one action Anvil itself carries out (Roslyn's server cannot
+/// add an additional document to a project).
+const ANVIL_ACTION: &str = "anvilAction";
+const ADD_STYLECOP_SETTINGS: &str = "addStyleCopSettings";
+
+/// "Add StyleCop settings file to the project", as VS offers it on a
+/// file-header warning while the project has no `stylecop.json`.
+fn stylecop_settings_action(doc: &CodeDoc, diags: &[lt::Diagnostic]) -> Option<Action> {
+    let header = diags.iter().any(|d| matches!(&d.code, Some(lt::NumberOrString::String(c)) if SETTINGS_FIX_RULES.contains(&c.as_str())));
+    if !header {
+        return None;
+    }
+    let app = crate::ui::window::app();
+    let sol = app.solution.borrow();
+    let project = sol.as_ref()?.project_of(&doc.path())?;
+    let text = std::fs::read_to_string(&project.path).ok()?;
+    let c = anvil_core::csproj::Csproj::parse(&text).ok()?;
+    if c.has_additional_file("stylecop.json") {
+        return None;
+    }
+    let title = tr("Add StyleCop settings file to the project");
+    let raw = json!({"title": title, ANVIL_ACTION: ADD_STYLECOP_SETTINGS, "project": project.path, "dir": project.dir});
+    Some(Action { title: title.clone(), offered: anvil_lsp::code_actions::Offered { path: vec![title], raw, scope: None }, resolved: None })
+}
+
+/// Writes `stylecop.json` beside the project (kept if it exists) and
+/// lists it as `<AdditionalFiles>`, as StyleCop's fix does in VS.
+fn add_stylecop_settings(action: &Value) {
+    let (Some(project), Some(dir)) = (action.get("project").and_then(Value::as_str), action.get("dir").and_then(Value::as_str)) else { return };
+    let path = Path::new(dir).join("stylecop.json");
+    if !path.exists() {
+        let bytes = anvil_core::templates::render(anvil_core::templates::ItemTemplate::StyleCopSettings, &anvil_core::templates::Ctx { namespace: "", name: "stylecop" });
+        if let Err(e) = anvil_core::text::write_atomic(&path, &bytes) {
+            return crate::ui::window::show_error(&tr("Add StyleCop settings file to the project"), &e.to_string());
+        }
+    }
+    if let Err(e) = crate::ui::newitem::register_additional_file(Path::new(project), "stylecop.json") {
+        return crate::ui::window::show_error(&tr("Add StyleCop settings file to the project"), &e);
+    }
+    crate::ui::explorer::reload_solution_model();
+    crate::ui::window::app().tabs.open(&path, false);
 }
 
 /// Ctrl+. : the code actions at the caret (with the diagnostics of its
@@ -451,7 +505,10 @@ pub fn quick_actions() {
             Ok(v) => v.as_array().cloned().unwrap_or_default(),
             Err(e) => return report(&e),
         };
-        let actions = flatten_actions(list);
+        let mut actions = flatten_actions(list);
+        if let Some(a) = stylecop_settings_action(&doc, &diags) {
+            actions.insert(0, a);
+        }
         if actions.is_empty() {
             return flash(&tr("No quick actions here."));
         }
@@ -497,8 +554,8 @@ fn show_actions(client: Client, doc: Rc<CodeDoc>, actions: Vec<Action>) {
                 Some(r) => r,
                 None => {
                     pv.set_markup(&format!("<i>{}</i>", glib::markup_escape_text(&tr("Loading preview…"))));
-                    let raw = acts.borrow().get(i).map(|a| a.raw.clone()).unwrap_or(Value::Null);
-                    let r = resolve(&c, &raw).await;
+                    let Some(o) = acts.borrow().get(i).map(|a| a.offered.clone()) else { return };
+                    let r = resolve(&c, &o).await;
                     if let Some(a) = acts.borrow_mut().get_mut(i) {
                         a.resolved = Some(r.clone());
                     }
@@ -518,8 +575,8 @@ fn show_actions(client: Client, doc: Rc<CodeDoc>, actions: Vec<Action>) {
             let action = match cached {
                 Some(r) => r,
                 None => {
-                    let raw = acts.borrow().get(i).map(|a| a.raw.clone()).unwrap_or(Value::Null);
-                    resolve(&client, &raw).await
+                    let Some(o) = acts.borrow().get(i).map(|a| a.offered.clone()) else { return };
+                    resolve(&client, &o).await
                 }
             };
             apply_action(&client, &action).await;
@@ -533,6 +590,9 @@ fn show_actions(client: Client, doc: Rc<CodeDoc>, actions: Vec<Action>) {
 }
 
 async fn apply_action(client: &Client, action: &Value) {
+    if action.get(ANVIL_ACTION).and_then(Value::as_str) == Some(ADD_STYLECOP_SETTINGS) {
+        return add_stylecop_settings(action);
+    }
     let mut did = false;
     if let Some(edit) = action.get("edit").and_then(|e| serde_json::from_value::<lt::WorkspaceEdit>(e.clone()).ok()) {
         did = crate::ui::lsp::apply_workspace_edit(&edit);
@@ -540,7 +600,9 @@ async fn apply_action(client: &Client, action: &Value) {
             flash(&tr("The change could not be applied to every file."));
         }
     }
-    if let Some(cmd) = action.get("command").filter(|c| c.get("command").is_some()) {
+    // `roslyn.client.*` commands (nested actions, Fix All) exist only in
+    // VS Code; their edit came from resolving, the server cannot run them.
+    if let Some(cmd) = action.get("command").filter(|c| c.get("command").and_then(Value::as_str).is_some_and(|n| !anvil_lsp::code_actions::is_client_command(n))) {
         did = true;
         if let Err(e) = ask(client, "workspace/executeCommand", json!({"command": cmd.get("command"), "arguments": cmd.get("arguments")}), QUICK).await {
             report(&e);
@@ -555,6 +617,10 @@ async fn apply_action(client: &Client, action: &Value) {
 /// per changed file.
 fn preview_markup(action: &Value) -> String {
     let p = crate::palette::current();
+    if action.get(ANVIL_ACTION).and_then(Value::as_str) == Some(ADD_STYLECOP_SETTINGS) {
+        let add = |l: &str| format!("<span foreground=\"{}\">+ {}</span>", hex(&p.up), glib::markup_escape_text(l));
+        return ["<b>stylecop.json</b>".to_owned(), add("\"settings\": { \"documentationRules\": { \"companyName\": … } }"), String::new(), "<b>.csproj</b>".to_owned(), add("<AdditionalFiles Include=\"stylecop.json\" />")].join("\n");
+    }
     let Some(edit) = action.get("edit").and_then(|e| serde_json::from_value::<lt::WorkspaceEdit>(e.clone()).ok()) else {
         return glib::markup_escape_text(&tr("No preview: this action runs a command.")).to_string();
     };
@@ -681,9 +747,9 @@ mod tests {
     }
 
     #[test]
-    fn nested_actions_are_offered_one_by_one() {
-        let list = vec![json!({"title": "using System.Text;", "data": {}}), json!({"title": "Suppress or configure issues", "data": {"NestedCodeActions": [{"title": "Suppress CA1859"}, {"title": "Configure severity"}]}})];
+    fn fix_all_entries_name_their_scope() {
+        let list = vec![json!({"title": "Fix All: Declare accessibility", "command": {"command": "roslyn.client.fixAllCodeAction", "arguments": [{"UniqueIdentifier": "Fix All: Declare accessibility", "FixAllFlavors": ["Document", "Solution"]}]}})];
         let t: Vec<String> = flatten_actions(list).into_iter().map(|a| a.title).collect();
-        assert_eq!(t, ["using System.Text;", "Suppress or configure issues › Suppress CA1859", "Suppress or configure issues › Configure severity"]);
+        assert_eq!(t, ["Fix All: Declare accessibility › in Document", "Fix All: Declare accessibility › in Solution"]);
     }
 }

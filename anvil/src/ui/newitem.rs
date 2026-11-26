@@ -24,6 +24,7 @@ fn template_detail(t: ItemTemplate) -> String {
         ItemTemplate::Json => tr("An empty JSON file"),
         ItemTemplate::Text => tr("An empty text file"),
         ItemTemplate::EditorConfig => tr("The .NET code style settings file"),
+        ItemTemplate::StyleCopSettings => tr("StyleCop's settings (stylecop.json), registered in the project as VS does"),
     }
 }
 
@@ -164,6 +165,13 @@ pub fn add_item(project: &str, dir: &Path, t: ItemTemplate, file_name: &str) -> 
         window::show_error(&tr("Add New Item"), &e.to_string());
         return None;
     }
+    if t == ItemTemplate::StyleCopSettings {
+        let rel = path.strip_prefix(&p.dir).map(|r| r.to_string_lossy().into_owned()).unwrap_or_else(|_| file_name.to_owned());
+        if let Err(e) = register_additional_file(&p.path, &rel) {
+            window::show_error(&tr("Add New Item"), &e);
+        }
+        crate::ui::explorer::reload_solution_model();
+    }
     app.explorer.reload();
     app.tabs.open(&path, false);
     if let Some(d) = app.tabs.current_code() {
@@ -175,4 +183,16 @@ pub fn add_item(project: &str, dir: &Path, t: ItemTemplate, file_name: &str) -> 
         }
     }
     Some(path)
+}
+
+/// Lists `rel` as `<AdditionalFiles>` in the project file, unless it is
+/// already: without that StyleCop never reads its settings.
+pub fn register_additional_file(project: &Path, rel: &str) -> Result<(), String> {
+    let mut file = anvil_core::text::TextFile::read(project).map_err(|e| e.to_string())?;
+    let c = anvil_core::csproj::Csproj::parse(&file.text).map_err(|e| e.0)?;
+    if c.has_additional_file(rel) {
+        return Ok(());
+    }
+    file.text = anvil_core::edit::apply(&file.text, &[c.add_additional_file(rel)]);
+    file.write(project).map_err(|e| e.to_string())
 }

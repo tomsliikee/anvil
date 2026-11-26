@@ -27,10 +27,11 @@ pub enum ItemTemplate {
     Json,
     Text,
     EditorConfig,
+    StyleCopSettings,
 }
 
 impl ItemTemplate {
-    pub const ALL: [ItemTemplate; 11] = [
+    pub const ALL: [ItemTemplate; 12] = [
         ItemTemplate::Class,
         ItemTemplate::Interface,
         ItemTemplate::Enum,
@@ -42,6 +43,7 @@ impl ItemTemplate {
         ItemTemplate::Json,
         ItemTemplate::Text,
         ItemTemplate::EditorConfig,
+        ItemTemplate::StyleCopSettings,
     ];
 
     /// VS' name in the Add New Item dialog (English; translated in the UI).
@@ -58,6 +60,7 @@ impl ItemTemplate {
             ItemTemplate::Json => "JSON File",
             ItemTemplate::Text => "Text File",
             ItemTemplate::EditorConfig => "editorconfig File (.NET)",
+            ItemTemplate::StyleCopSettings => "StyleCop Settings File",
         }
     }
 
@@ -75,6 +78,7 @@ impl ItemTemplate {
             ItemTemplate::Json => ("JSON", ".json"),
             ItemTemplate::Text => ("TextFile", ".txt"),
             ItemTemplate::EditorConfig => (".editorconfig", ""),
+            ItemTemplate::StyleCopSettings => ("stylecop", ".json"),
         }
     }
 }
@@ -107,9 +111,16 @@ pub fn render(t: ItemTemplate, ctx: &Ctx) -> Vec<u8> {
         ItemTemplate::Json => "{\n}\n".to_owned(),
         ItemTemplate::Text => String::new(),
         ItemTemplate::EditorConfig => include_str!("../templates/editorconfig.txt").to_owned(),
+        ItemTemplate::StyleCopSettings => STYLECOP_JSON.to_owned(),
     };
     TextFile { encoding: Encoding::Utf8 { bom: true }, eol: Eol::Crlf, text }.encode()
 }
+
+/// What StyleCop.Analyzers 1.1.118's "Add StyleCop settings file" fix
+/// writes (copied from `StyleCop.Analyzers.CodeFixes.dll`; CRLF there).
+/// The file takes effect once the project lists it as `AdditionalFiles`
+/// ([`crate::csproj::Csproj::add_additional_file`]).
+pub const STYLECOP_JSON: &str = "{\n  // ACTION REQUIRED: This file was automatically added to your project, but it\n  // will not take effect until additional steps are taken to enable it. See the\n  // following page for additional information:\n  //\n  // https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/EnableConfiguration.md\n\n  \"$schema\": \"https://raw.githubusercontent.com/DotNetAnalyzers/StyleCopAnalyzers/master/StyleCop.Analyzers/StyleCop.Analyzers/Settings/stylecop.schema.json\",\n  \"settings\": {\n    \"documentationRules\": {\n      \"companyName\": \"PlaceholderCompany\"\n    }\n  }\n}\n";
 
 /// `Program.cs` of VS 2026's Console App with "Do not use top-level
 /// statements": block namespace, `internal class Program`, as the course's
@@ -200,6 +211,19 @@ mod tests {
     fn next_names() {
         assert_eq!(next_free_name(&fixtures(), "Class", ".cs"), "Class1.cs");
         assert_eq!(next_free_name(&fixtures(), "ClassDiagram", ".cd"), "ClassDiagram2.cd");
+    }
+
+    /// Byte for byte what the fix in StyleCop.Analyzers 1.1.118 writes
+    /// (UTF-16 resource in `StyleCop.Analyzers.CodeFixes.dll`, CRLF), with
+    /// VS' BOM.
+    #[test]
+    fn stylecop_settings_as_the_code_fix_writes_them() {
+        let b = render(ItemTemplate::StyleCopSettings, &Ctx { namespace: "X", name: "stylecop" });
+        let t = String::from_utf8(b).unwrap();
+        assert!(t.starts_with("\u{feff}{\r\n  // ACTION REQUIRED:"));
+        assert!(t.contains("\"companyName\": \"PlaceholderCompany\"\r\n"));
+        assert!(t.ends_with("  }\r\n}\r\n"));
+        assert_eq!(ItemTemplate::StyleCopSettings.default_name(), ("stylecop", ".json"));
     }
 
     #[test]

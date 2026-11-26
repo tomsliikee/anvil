@@ -3,6 +3,7 @@
 //! host) and hands the pipes to [`client::Client::start`].
 
 pub mod client;
+pub mod code_actions;
 pub mod completion;
 pub mod navigation;
 pub mod position;

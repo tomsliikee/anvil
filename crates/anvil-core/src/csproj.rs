@@ -123,6 +123,29 @@ impl Csproj {
         self.doc.insert_child(0, after, &format!("\n{STYLECOP_BLOCK}"))
     }
 
+    /// `<AdditionalFiles Include>` paths (StyleCop reads `stylecop.json`
+    /// only when it is one).
+    pub fn additional_files(&self) -> Vec<String> {
+        self.doc.all("AdditionalFiles").filter_map(|i| self.doc.attr(i, "Include").map(str::to_owned)).collect()
+    }
+
+    /// Whether `rel_path` (`/` or `\\` separated) is an additional file.
+    pub fn has_additional_file(&self, rel_path: &str) -> bool {
+        let want = rel_path.replace('\\', "/");
+        self.additional_files().iter().any(|f| f.replace('\\', "/").eq_ignore_ascii_case(&want))
+    }
+
+    /// Makes `rel_path` an analyzer additional file as Visual Studio does
+    /// when StyleCop's "Add StyleCop settings file" fix adds
+    /// `stylecop.json` to an SDK project: the file leaves the `None` glob
+    /// and becomes `AdditionalFiles`, each in an ItemGroup of its own at
+    /// the end, an empty line before each.
+    pub fn add_additional_file(&self, rel_path: &str) -> TextEdit {
+        let p = rel_path.replace('/', "\\");
+        let after = self.doc.children(0).last();
+        self.doc.insert_child(0, after, &format!("\n<ItemGroup>\n  <None Remove=\"{p}\" />\n</ItemGroup>\n\n<ItemGroup>\n  <AdditionalFiles Include=\"{p}\" />\n</ItemGroup>"))
+    }
+
     pub fn target_framework(&self) -> Option<String> {
         self.property("TargetFramework").or_else(|| self.property("TargetFrameworks").and_then(|t| t.split(';').next().map(str::to_owned)))
     }
@@ -196,6 +219,18 @@ mod tests {
         f.eol = crate::text::Eol::Crlf;
         let course = std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/doublyLinkedList/doublyLinkedList/doublyLinkedList.csproj")).unwrap();
         assert_eq!(String::from_utf8(f.encode()).unwrap(), String::from_utf8(course).unwrap());
+    }
+
+    #[test]
+    fn stylecop_settings_become_an_additional_file() {
+        let mut f = course();
+        let c = Csproj::parse(&f.text).unwrap();
+        assert!(!c.has_additional_file("stylecop.json"));
+        f.text = apply(&f.text, &[c.add_additional_file("stylecop.json")]);
+        assert!(f.text.ends_with("    </PackageReference>\n  </ItemGroup>\n\n  <ItemGroup>\n    <None Remove=\"stylecop.json\" />\n  </ItemGroup>\n\n  <ItemGroup>\n    <AdditionalFiles Include=\"stylecop.json\" />\n  </ItemGroup>\n\n</Project>\n"), "{}", f.text);
+        let c = Csproj::parse(&f.text).unwrap();
+        assert!(c.has_additional_file("stylecop.json") && c.has_additional_file("STYLECOP.json"));
+        assert_eq!(c.additional_files(), ["stylecop.json"]);
     }
 
     #[test]

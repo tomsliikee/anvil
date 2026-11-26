@@ -95,6 +95,16 @@ pub fn run(dir: PathBuf) {
         next(Rc::new(dir), Rc::new(steps), 0);
         return;
     }
+    // ANVIL_SHOTS=completion with ANVIL_OPEN=<solution> and ANVIL_TYPE_FILE:
+    // types identifiers as a person does and logs whether IntelliSense
+    // opens, how fast, and with how many entries.
+    if std::env::var("ANVIL_SHOTS").as_deref() == Ok("completion")
+        && let (Ok(open), Ok(file)) = (std::env::var("ANVIL_OPEN"), std::env::var("ANVIL_TYPE_FILE"))
+    {
+        steps.extend(completion_steps(PathBuf::from(open), PathBuf::from(file)));
+        next(Rc::new(dir), Rc::new(steps), 0);
+        return;
+    }
     // ANVIL_SHOTS=keys: Feature Search, the dialogs and the find bar with
     // keyboard focus shown, for the keyboard and consistency audit.
     if std::env::var("ANVIL_SHOTS").as_deref() == Ok("keys")
@@ -602,6 +612,61 @@ fn typing_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
             }
         }),
     ]);
+    steps
+}
+
+/// Typed one key at a time with a pause after each, then what IntelliSense
+/// shows: for the identifier cases a person meets (a type, a local, a
+/// member after a dot, a keyword, an identifier after an operator).
+fn completion_steps(sol: PathBuf, file: PathBuf) -> Vec<Step> {
+    let ready = || crate::ui::window::app().lsp.client().is_some();
+    let mut steps = vec![act(move || window::open_path(&sol)), Step::Wait(1500)];
+    steps.extend([
+        act(move || {
+            let app = crate::ui::window::app();
+            app.tabs.open(&file, false);
+            if let Some(d) = app.tabs.current_code()
+                && let Some(i) = d.text().find("list.Clear();")
+            {
+                let mut it = d.iter_at_byte(i);
+                d.buffer.insert(&mut it, "\n            \n");
+                d.goto_line_col(d.iter_at_byte(i).line() + 1, 12);
+            }
+        }),
+        until(ready, 120_000),
+        Step::Wait(25_000),
+        act(close_dialogs),
+    ]);
+    for (n, text) in ["Con", "sole.", "Wr", "\n", "var x = Pers", "\n", "if (li", "\n", "var o = new ", "\n", "var z = ", "\n"].into_iter().enumerate() {
+        for c in text.chars() {
+            steps.push(act(move || {
+                if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                    d.view.scroll_mark_onscreen(&d.buffer.get_insert());
+                    d.view.emit_insert_at_cursor(&c.to_string());
+                }
+            }));
+            steps.push(Step::Wait(120));
+        }
+        steps.push(Step::Wait(1500));
+        steps.push(act(move || {
+            eprintln!("anvil: completion step {n}: open={}", crate::ui::lsp::completion_open());
+            if let Some(d) = crate::ui::window::app().tabs.current_code() {
+                let mut c = d.view.first_child();
+                while let Some(w) = c {
+                    if w.type_().name() == "GtkSourceCompletionList" {
+                        eprintln!("anvil: list at step {n}: visible={} mapped={} alloc={}x{}", w.is_visible(), w.is_mapped(), w.width(), w.height());
+                    }
+                    c = w.next_sibling();
+                }
+            }
+        }));
+        steps.push(Step::Shot(["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11"][n]));
+    }
+    steps.push(act(|| {
+        if let Some(d) = crate::ui::window::app().tabs.current_code() {
+            d.buffer.set_modified(false);
+        }
+    }));
     steps
 }
 

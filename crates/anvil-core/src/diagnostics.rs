@@ -1,14 +1,14 @@
 //! Diagnostics from `dotnet build` / MSBuild console output
 //! (`file(line,col): warning SA1633: message [project]`).
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum Severity {
     Error,
     Warning,
     Info,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Diagnostic {
     pub file: String,
     /// 1-based, as MSBuild and the Error List show them.

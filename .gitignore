@@ -3,3 +3,7 @@
 /build-dir
 /.flatpak-builder
 /repo
+# What dotnet and Anvil write into the test solutions
+/crates/anvil-core/tests/fixtures/**/bin/
+/crates/anvil-core/tests/fixtures/**/obj/
+/crates/anvil-core/tests/fixtures/**/.vs/

@@ -134,6 +134,7 @@ fn run(r: Run, done: Box<dyn FnOnce(bool)>) {
         let mut diags: Vec<diagnostics::Diagnostic> = Vec::new();
         let mut seen = std::collections::HashSet::new();
         let mut finished = 0usize;
+        let mut finished_outputs: Vec<(String, PathBuf)> = Vec::new();
         let mut first_line = true;
         let mut shown_progress = 0usize;
         // The Error List fills while the build runs, a few times a second.
@@ -154,6 +155,7 @@ fn run(r: Run, done: Box<dyn FnOnce(bool)>) {
                     }
                     if let Some((project, out)) = anvil_core::build::finished_project(&l) {
                         app.builder.outputs.borrow_mut().insert(project.to_owned(), PathBuf::from(out));
+                        finished_outputs.push((project.to_owned(), PathBuf::from(out)));
                         finished += 1;
                     }
                     if finished > 0 && r.projects.len() > 1 && shown_progress != finished {
@@ -188,6 +190,19 @@ fn run(r: Run, done: Box<dyn FnOnce(bool)>) {
         }
         if ok && r.restore {
             anvil_core::build::mark_restored(&r.projects);
+        }
+        // A project the build found up to date ran no analyzer: its
+        // StyleCop warnings come from the build that compiled it.
+        if let Some(dir) = window::solution_dir().filter(|_| status.is_some()) {
+            let mut memory = anvil_core::build::BuildMemory::load(&dir);
+            if r.verb == Verb::Clean {
+                memory.clear();
+            } else {
+                diags = memory.merge(&diags, &finished_outputs);
+            }
+            if let Err(e) = memory.save(&dir) {
+                app.output.append("Build", &format!("{}\n", trf("Anvil could not save the build state: {}", &[&e.to_string()])));
+            }
         }
         app.errors.set_build(&diags, window::solution_dir().as_deref());
         let c = diagnostics::counts(&diags);
