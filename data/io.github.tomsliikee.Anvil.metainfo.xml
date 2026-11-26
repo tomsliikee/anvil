@@ -11,7 +11,10 @@
   <description>
     <p>Anvil opens Visual Studio solutions, edits, builds, runs, tests and debugs them, and writes every file as Visual Studio would, so a solution made on Linux opens unchanged in Visual Studio. Its class diagram round-trips Visual Studio's Class Designer files.</p>
   </description>
-  <launchable type="desktop-id">io.github.tomsliikee.Anvil.desktop</launchable>
+  <url type="homepage">https://github.com/tomsliikee/anvil</url>
+  <url type="bugtracker">https://github.com/tomsliikee/anvil/issues</url>
+  <url type="vcs-browser">https://github.com/tomsliikee/anvil</url>
+  <launchabletype="desktop-id">io.github.tomsliikee.Anvil.desktop</launchable>
   <content_rating type="oars-1.1"/>
   <releases>
     <release version="0.1.0" date="2026-11-18"/>

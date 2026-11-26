@@ -166,7 +166,7 @@ Network: the two first-start downloads (with consent), nuget.org in the package 
 
 | Platform | State |
 | :--- | :--- |
-| **Fedora 44**, GNOME, Flatpak on GNOME 51 runtime | ***tested*** (installed, opened the course assignment, built it, screenshots) |
+| **Linux:** Fedora 44, GNOME, Flatpak on GNOME 51 runtime | ***tested*** (installed, opened the course assignment, built it, screenshots) |
 | Other distributions with Flatpak | ***planned*** |
 | macOS, Windows | not a target |
 
@@ -174,7 +174,14 @@ The host needs **Flatpak** and the **.NET 10 SDK**; Anvil says so plainly when `
 
 ---
 
-## Build
+## Install and Build
+
+**Get the source:**
+
+```bash
+git clone https://github.com/tomsliikee/anvil.git
+cd anvil
+```
 
 **Once:**
 
@@ -192,9 +199,19 @@ flatpak install --user flathub org.gnome.Sdk//51 org.gnome.Platform//51 org.free
 
 The GNOME 51 runtime has no VTE; the manifest builds **VTE 0.84.1** as a module. For SDK builds outside flatpak-builder, VTE is built once into `target-sdk/deps/prefix` (meson in the SDK, the same options as the manifest) and `tools/sdk.sh` puts it and the bundled fonts on the paths.
 
-**Screenshot mode:** with `ANVIL_SCREENSHOT=<dir>` and `ANVIL_OPEN=<solution>` Anvil walks through itself and writes PNGs at 2x: start page, editor, Error List after a build, class diagram, Add New Item, Settings → Keyboard, ghost text, chat, dark. `ANVIL_SHOTS=ui` takes the quick pass instead (no build, no AI): four files opened as preview tabs in a row, the diagram, New Project, New Item and Settings in light and dark. `ANVIL_SHOTS=debug` with a `DebugDemo` solution (a loop at line 11, `Console.ReadLine` at line 17) runs F5 for real: breakpoint with hit count, Locals, steps, Watch, Breakpoints, Call Stack, input in the terminal, end of the program. `ANVIL_SHOTS=debug-repro` runs F5 on any solution and logs the session (state, Locals, Watch, debug windows): `ANVIL_DEBUG_BREAKS=src/Lib/Calc.cs:10;App/Program.cs:7` (relative to the solution), `ANVIL_DEBUG_STARTUP=<project>`, `ANVIL_DEBUG_OPEN=after` (no file open before F5), `ANVIL_DEBUG_INPUT=<line>`, `ANVIL_DEBUG_END=continue|stop|restart|cancel`. `ANVIL_SHOTS=ai` with `ANVIL_OPEN=<file.cs>` (a `var p = new Person();` line) types against the local Ollama key by key: ghost text, Tab, the hints for a missing model and an unreachable Ollama, Settings → AI. `ANVIL_SHOTS=build` on any solution: the build job in the status line, the result toast, the Output window, Ctrl+F5 and its exit code, in light and dark. `ANVIL_TIMING=1` prints start-up and solution-open milestones, build start to first output, and every main-thread stall over 16 ms on stderr. `ANVIL_CONFIG_DIR` keeps such runs out of the real configuration, and a screenshot run is always its own process, never a window of a running Anvil.
+**Screenshot and test modes:** Anvil can walk through itself and write PNGs at 2x. A run is always its own process, never a window of a running Anvil, and **`ANVIL_CONFIG_DIR`** keeps it out of the real configuration.
 
-**Jank log:** `ANVIL_FRAME_LOG=1` writes every main-loop turn longer than 16 ms to stderr with the named work in it (frame layout and paint, name highlighting, completion, squiggles, Error List, designer) and a summary with keystroke-to-frame latency when Anvil quits. `ANVIL_SHOTS=typing` with `ANVIL_OPEN=<solution>` and `ANVIL_TYPE_FILE=<large .cs file with a // TYPE HERE line>` waits for Roslyn, types C# at about 14 keys a second with pauses, then rests and jumps 1700 lines, with one summary each.
+| Variable | What it does |
+| :--- | :--- |
+| **`ANVIL_SCREENSHOT=<dir>`** + **`ANVIL_OPEN=<solution>`** | Start page, editor, Error List after a build, class diagram, Add New Item, Settings → Keyboard, ghost text, chat, dark |
+| **`ANVIL_SHOTS=ui`** | Quick pass without build or AI: four files as preview tabs in a row, the diagram, New Project, New Item and Settings in light and dark |
+| **`ANVIL_SHOTS=debug`** | Runs F5 for real on a `DebugDemo` solution (loop at line 11, `Console.ReadLine` at line 17): breakpoint with hit count, Locals, steps, Watch, Call Stack, input in the terminal |
+| **`ANVIL_SHOTS=debug-repro`** | F5 on any solution, logged. Tuned by **`ANVIL_DEBUG_BREAKS`** (`src/Lib/Calc.cs:10;App/Program.cs:7`, relative to the solution), **`ANVIL_DEBUG_STARTUP`**, **`ANVIL_DEBUG_OPEN=after`**, **`ANVIL_DEBUG_INPUT`**, **`ANVIL_DEBUG_END=continue\|stop\|restart\|cancel`** |
+| **`ANVIL_SHOTS=ai`** + **`ANVIL_OPEN=<file.cs>`** | Types a `var p = new Person();` line against the local Ollama key by key: ghost text, Tab, the hints for a missing model and an unreachable Ollama, Settings → AI |
+| **`ANVIL_SHOTS=build`** | Build job in the status line, result toast, Output window, Ctrl+F5 and its exit code, light and dark |
+| **`ANVIL_SHOTS=typing`** + **`ANVIL_OPEN`**, **`ANVIL_TYPE_FILE`** | Waits for Roslyn, types C# at about 14 keys a second, rests, jumps 1700 lines, one summary each |
+| **`ANVIL_TIMING=1`** | Start-up and solution-open milestones, build start to first output, every main-thread stall over 16 ms, on stderr |
+| **`ANVIL_FRAME_LOG=1`** | Every main-loop turn over 16 ms with the named work in it, and keystroke-to-frame latency when Anvil quits |
 
 ```bash
 flatpak run --env=ANVIL_SCREENSHOT=$PWD/readmestuff/shots --env=ANVIL_OPEN=$PWD/target-sdk/shots/course/doublyLinkedList.slnx io.github.tomsliikee.Anvil
@@ -215,4 +232,4 @@ flatpak run --env=ANVIL_SCREENSHOT=$PWD/readmestuff/shots --env=ANVIL_OPEN=$PWD/
 
 ## License
 
-MIT. Fonts: **Inter**, **Geist Mono**, **Geist Serif** and **Cascadia Mono** (Microsoft, v2407.24) under the SIL Open Font License (`insights-mono/fonts/`). The debugger is Samsung's **netcoredbg** (MIT), downloaded on first use.
+MIT, see [`LICENSE`](LICENSE). **Anvil** is an independent project and is not affiliated with or endorsed by Microsoft; *Visual Studio* is a Microsoft trademark, used here only to say which file formats Anvil reads and writes. Fonts: **Inter**, **Geist Mono**, **Geist Serif** and **Cascadia Mono** (Microsoft, v2407.24) under the SIL Open Font License (`insights-mono/fonts/`). The debugger is Samsung's **netcoredbg** (MIT), downloaded on first use.
