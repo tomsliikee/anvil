@@ -1221,6 +1221,7 @@ mod hover {
             Box::pin(async move {
                 let fail = || glib::Error::new(gio::IOErrorEnum::NotFound, "no hover");
                 let (Some(doc), Some(it)) = (doc, it) else { return Err(fail()) };
+                remember_tip(&display, &it);
                 let start = doc.buffer.start_iter();
                 let byte = doc.buffer.text(&start, &it, true).len();
                 // Debugger first: while stopped, a hover shows the value as
@@ -1262,7 +1263,79 @@ glib::wrapper! {
     pub struct HoverProvider(ObjectSubclass<hover::Hover>) @implements sourceview5::HoverProvider;
 }
 
+/// The tip showing (or about to show) and the word it belongs to, as
+/// character offsets. GtkSourceView hides its tip only on pointer motion it
+/// sees itself; leaving the window or a late answer left it stuck, so the
+/// editor closes it too.
+struct Tip {
+    display: glib::WeakRef<sourceview5::HoverDisplay>,
+    start: i32,
+    end: i32,
+}
+
+fn remember_tip(display: &sourceview5::HoverDisplay, it: &gtk::TextIter) {
+    let mut ws = *it;
+    if !ws.starts_word() {
+        ws.backward_word_start();
+    }
+    let mut we = *it;
+    if !we.ends_word() {
+        we.forward_word_end();
+    }
+    HOVER_TIP.with(|t| *t.borrow_mut() = Some(Tip { display: display.downgrade(), start: ws.offset(), end: we.offset() }));
+}
+
+/// The widget that carries the tip: the assistant around the display.
+fn tip_root() -> Option<(gtk::Widget, i32, i32)> {
+    let (display, start, end) = HOVER_TIP.with(|t| t.borrow().as_ref().and_then(|t| t.display.upgrade().map(|d| (d, t.start, t.end))))?;
+    let mut w: gtk::Widget = display.upcast();
+    let mut cur = Some(w.clone());
+    while let Some(x) = cur {
+        if x.type_().name().contains("Assistant") {
+            w = x;
+            break;
+        }
+        cur = x.parent();
+    }
+    Some((w, start, end))
+}
+
+fn dismiss_tip() {
+    if let Some((root, _, _)) = tip_root()
+        && root.is_visible()
+    {
+        match root.clone().downcast::<gtk::Popover>() {
+            Ok(p) => p.popdown(),
+            Err(_) => root.set_visible(false),
+        }
+    }
+}
+
+/// Pointer moved in the editor: the tip stays only while it is over the
+/// tip or the word the tip explains.
+fn guard_tip(view: &sourceview5::View, x: f64, y: f64) {
+    let Some((root, start, end)) = tip_root() else { return };
+    if !root.is_visible() {
+        return;
+    }
+    if let Some(b) = root.compute_bounds(view)
+        && (b.x() - 6.0..=b.x() + b.width() + 6.0).contains(&(x as f32))
+        && (b.y() - 6.0..=b.y() + b.height() + 6.0).contains(&(y as f32))
+    {
+        return;
+    }
+    let (bx, by) = view.window_to_buffer_coords(gtk::TextWindowType::Widget, x as i32, y as i32);
+    if let Some(it) = view.iter_at_location(bx, by) {
+        let r = view.iter_location(&it);
+        if (start..=end).contains(&it.offset()) && by >= r.y() && by < r.y() + r.height() {
+            return;
+        }
+    }
+    dismiss_tip();
+}
+
 thread_local! {
+    static HOVER_TIP: RefCell<Option<Tip>> = const { RefCell::new(None) };
     static COMPLETION_OPEN: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -1291,6 +1364,19 @@ pub fn attach_providers(doc: &Rc<CodeDoc>) {
     *hp.imp().doc.borrow_mut() = Rc::downgrade(doc);
     hover.add_provider(&hp);
     hover.set_hover_delay(450);
+    let motion = gtk::EventControllerMotion::new();
+    motion.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let view = doc.view.clone();
+    motion.connect_motion(move |_, x, y| guard_tip(view.upcast_ref(), x, y));
+    motion.connect_leave(|_| dismiss_tip());
+    doc.view.add_controller(motion);
+    let keys = gtk::EventControllerKey::new();
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    keys.connect_key_pressed(|_, _, _, _| {
+        dismiss_tip();
+        glib::Propagation::Proceed
+    });
+    doc.view.add_controller(keys);
     // Signature help after `(` and `,`, closed by `)`.
     let weak = Rc::downgrade(doc);
     doc.buffer.connect_insert_text(move |_, _, text| {
