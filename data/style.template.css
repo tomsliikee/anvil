@@ -798,6 +798,22 @@ window.density-compact paned.workspace {
   padding: 12px;
 }
 
+/* Class Designer context menus: bigger rows, easy to hit without zooming. */
+popover.menu.roomy modelbutton {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+popover.menu.roomy contents {
+  min-width: 240px;
+  padding: 6px;
+}
+
+popover.menu.roomy separator {
+  margin: 4px 0;
+}
+
 /* Popovers fade in like the panels. */
 popover > contents {
   animation: anvil-pop 150ms ease-out;

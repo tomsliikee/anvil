@@ -954,12 +954,12 @@ fn polyline(points: &[(f32, f32)], radius: f32) -> gsk::Path {
 /// UML heads at `tip`, pointing along `dir` (unit vector into the target):
 /// a hollow triangle for inheritance and realization, an open arrow for an
 /// association, a double open arrow for a collection association (VS).
-fn draw_head(s: &gtk::Snapshot, tip: (f32, f32), dir: (f32, f32), e: &Edge, p: &Palette, ground: &gdk::RGBA) {
-    let stroke = gsk::Stroke::new(1.2);
+fn draw_head(s: &gtk::Snapshot, tip: (f32, f32), dir: (f32, f32), e: &Edge, ink: &gdk::RGBA, width: f32, ground: &gdk::RGBA) {
+    let stroke = gsk::Stroke::new(width);
     let normal = (-dir.1, dir.0);
     let at = |back: f32, side: f32| (tip.0 - dir.0 * back + normal.0 * side, tip.1 - dir.1 * back + normal.1 * side);
     if e.inherit {
-        let (l, half) = (13.0, 7.0);
+        let (l, half) = (HEAD_LEN, 8.5);
         let (p1, p2) = (at(l, half), at(l, -half));
         let head = gsk::PathBuilder::new();
         head.move_to(tip.0, tip.1);
@@ -968,23 +968,29 @@ fn draw_head(s: &gtk::Snapshot, tip: (f32, f32), dir: (f32, f32), e: &Edge, p: &
         head.close();
         let path = head.to_path();
         s.append_fill(&path, gsk::FillRule::Winding, ground);
-        s.append_stroke(&path, &stroke, &p.ink2);
+        s.append_stroke(&path, &stroke, ink);
         return;
     }
-    let arrows: &[f32] = if e.collection { &[0.0, 6.0] } else { &[0.0] };
+    let arrows: &[f32] = if e.collection { &[0.0, 8.0] } else { &[0.0] };
     for &off in arrows {
         let t = at(off, 0.0);
-        let (p1, p2) = (at(off + 9.0, 5.0), at(off + 9.0, -5.0));
+        let (p1, p2) = (at(off + 11.0, 6.5), at(off + 11.0, -6.5));
         let head = gsk::PathBuilder::new();
         head.move_to(p1.0, p1.1);
         head.line_to(t.0, t.1);
         head.line_to(p2.0, p2.1);
-        s.append_stroke(&head.to_path(), &stroke, &p.ink2);
+        s.append_stroke(&head.to_path(), &stroke, ink);
     }
 }
 
+/// Length of the hollow inheritance triangle.
+const HEAD_LEN: f32 = 16.0;
+
 fn draw_edges(s: &gtk::Snapshot, st: &State, p: &Palette, ctx: &gtk::pango::Context, ground: &gdk::RGBA) {
     for (e, route) in st.edges.iter().zip(&st.routes) {
+        // Lines of the selected card stand out, the rest recedes a little.
+        let hot = st.selected.is_some_and(|i| e.from == i || e.to == i);
+        let (ink, width) = if hot { (&p.ink, 2.0) } else { (&p.ink2, 1.5) };
         let pts: Vec<(f32, f32)> = route.points.iter().map(|&(x, y)| (x as f32, y as f32)).collect();
         if pts.len() < 2 {
             continue;
@@ -995,23 +1001,23 @@ fn draw_edges(s: &gtk::Snapshot, st: &State, p: &Palette, ctx: &gtk::pango::Cont
         // The line stops where the head starts, so a hollow triangle stays
         // empty inside.
         let mut line = pts.clone();
-        let back: f32 = if e.inherit { 13.0 } else { 0.0 };
+        let back: f32 = if e.inherit { HEAD_LEN } else { 0.0 };
         if let Some(last) = line.last_mut() {
             *last = (tip.0 - dir.0 * back.min(l), tip.1 - dir.1 * back.min(l));
         }
-        let stroke = gsk::Stroke::new(1.2);
+        let stroke = gsk::Stroke::new(width);
         if e.realize {
-            stroke.set_dash(&[5.0, 4.0]);
+            stroke.set_dash(&[7.0, 5.0]);
         }
-        s.append_stroke(&polyline(&line, 6.0), &stroke, &p.ink2);
-        draw_head(s, tip, dir, e, p, ground);
+        s.append_stroke(&polyline(&line, 8.0), &stroke, ink);
+        draw_head(s, tip, dir, e, ink, width, ground);
         if !e.label.is_empty() {
             // Beside the target end, as VS writes the member name there.
             let (lx, ly) = if l > 40.0 { (tip.0 - dir.0 * 22.0, tip.1 - dir.1 * 22.0) } else { (route.label_at.0 as f32, route.label_at.1 as f32) };
-            let w = text_width(ctx, &e.label, "Cascadia Mono 8");
-            let (x, y) = if dir.0.abs() > 0.5 { (lx - w / 2.0, ly - 16.0) } else { (lx + 6.0, ly - 7.0) };
-            fill_rounded(s, rounded(graphene::Rect::new(x - 3.0, y, w + 6.0, 14.0), 4.0), ground);
-            text_at(s, ctx, &e.label, "Cascadia Mono 8", (x, y, w + 4.0), &p.ink2);
+            let w = text_width(ctx, &e.label, "Cascadia Mono 9.5");
+            let (x, y) = if dir.0.abs() > 0.5 { (lx - w / 2.0, ly - 19.0) } else { (lx + 6.0, ly - 8.0) };
+            fill_rounded(s, rounded(graphene::Rect::new(x - 3.0, y, w + 6.0, 17.0), 4.0), ground);
+            text_at(s, ctx, &e.label, "Cascadia Mono 9.5", (x, y, w + 4.0), &p.ink2);
         }
     }
     // Lollipops: implemented interfaces not on the diagram, a small ring
@@ -1022,16 +1028,16 @@ fn draw_edges(s: &gtk::Snapshot, st: &State, p: &Palette, ctx: &gtk::pango::Cont
         if ifaces.is_empty() {
             continue;
         }
-        let (x, y) = (c.x + 20.0, c.y);
+        let (x, y) = (c.x + 24.0, c.y);
         let stem = gsk::PathBuilder::new();
         stem.move_to(x, y);
-        stem.line_to(x, y - 14.0);
-        s.append_stroke(&stem.to_path(), &gsk::Stroke::new(1.2), &p.ink2);
+        stem.line_to(x, y - 16.0);
+        s.append_stroke(&stem.to_path(), &gsk::Stroke::new(1.5), &p.ink2);
         let ring = gsk::PathBuilder::new();
-        ring.add_circle(&graphene::Point::new(x, y - 19.0), 5.0);
-        s.append_stroke(&ring.to_path(), &gsk::Stroke::new(1.2), &p.ink2);
+        ring.add_circle(&graphene::Point::new(x, y - 22.0), 6.5);
+        s.append_stroke(&ring.to_path(), &gsk::Stroke::new(1.5), &p.ink2);
         let names = ifaces.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-        text_at(s, ctx, &names, "Cascadia Mono 8", (x + 9.0, y - 27.0, 260.0), &p.ink2);
+        text_at(s, ctx, &names, "Cascadia Mono 9.5", (x + 12.0, y - 30.0, 260.0), &p.ink2);
     }
 }
 
@@ -1919,7 +1925,7 @@ impl DiagramDoc {
         items.push(Item::Separator);
         items.push(run(tr("Remove from Diagram"), Rc::new(move || m5.edit_cd(|d| d.remove_shape(&n2)))));
         items.push(Item::Command("designer.delete-code"));
-        crate::ui::menus::popup(w, x, y, &items);
+        crate::ui::menus::popup(w, x, y, &items).add_css_class("roomy");
     }
 
     fn canvas_menu(&self, w: &gtk::Widget, x: f64, y: f64, wx: f32, wy: f32) {
@@ -1980,7 +1986,7 @@ impl DiagramDoc {
             Item::Separator,
             Item::Run(tr("Export Diagram as Image…"), Rc::new(move || e.export())),
         ];
-        crate::ui::menus::popup(w, x, y, &items);
+        crate::ui::menus::popup(w, x, y, &items).add_css_class("roomy");
     }
 
     fn show_related(&self, i: usize, base: bool) {

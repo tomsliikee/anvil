@@ -291,7 +291,7 @@ pub fn rebuild_menubar() {
 }
 
 /// A context menu at (x, y) of `parent`.
-pub fn popup(parent: &gtk::Widget, x: f64, y: f64, items: &[Item]) {
+pub fn popup(parent: &gtk::Widget, x: f64, y: f64, items: &[Item]) -> gtk::PopoverMenu {
     let mut custom = Vec::new();
     let m = model(items, &mut custom);
     let pop = gtk::PopoverMenu::from_model(Some(&m));
@@ -307,6 +307,7 @@ pub fn popup(parent: &gtk::Widget, x: f64, y: f64, items: &[Item]) {
         glib::idle_add_local_once(move || p.unparent());
     });
     pop.popup();
+    pop
 }
 
 thread_local! {

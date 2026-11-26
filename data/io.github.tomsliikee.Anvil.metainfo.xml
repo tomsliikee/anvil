@@ -14,7 +14,7 @@
   <url type="homepage">https://github.com/tomsliikee/anvil</url>
   <url type="bugtracker">https://github.com/tomsliikee/anvil/issues</url>
   <url type="vcs-browser">https://github.com/tomsliikee/anvil</url>
-  <launchabletype="desktop-id">io.github.tomsliikee.Anvil.desktop</launchable>
+  <launchable type="desktop-id">io.github.tomsliikee.Anvil.desktop</launchable>
   <content_rating type="oars-1.1"/>
   <releases>
     <release version="0.1.0" date="2026-11-18"/>
